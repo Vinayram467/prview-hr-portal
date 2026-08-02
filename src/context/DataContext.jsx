@@ -9,20 +9,27 @@ import {
 
 const STORAGE_KEY = "hr-dashboard:data";
 
+const DEFAULT_STATE = {
+  employees: seedEmployees,
+  attendance: seedAttendance,
+  leaves: seedLeaves,
+  payroll: seedPayroll,
+  tasks: seedTasks,
+};
+
 function loadInitialState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Merge with defaults so older saved data (from before a new field
+      // like `tasks` existed) doesn't crash the app with `undefined`.
+      return { ...DEFAULT_STATE, ...parsed };
+    }
   } catch {
     // fall through to seed data
   }
-  return {
-    employees: seedEmployees,
-    attendance: seedAttendance,
-    leaves: seedLeaves,
-    payroll: seedPayroll,
-    tasks: seedTasks,
-  };
+  return DEFAULT_STATE;
 }
 
 const DataContext = createContext(null);
@@ -141,13 +148,7 @@ export function DataProvider({ children }) {
   }
 
   function resetDemoData() {
-    setState({
-      employees: seedEmployees,
-      attendance: seedAttendance,
-      leaves: seedLeaves,
-      payroll: seedPayroll,
-      tasks: seedTasks,
-    });
+    setState(DEFAULT_STATE);
   }
 
   return (
