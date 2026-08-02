@@ -13,7 +13,7 @@ export const DEMO_ACCOUNTS = [
   {
     username: "admin",
     password: "admin123",
-    profile: { id: "user-admin", name: "Sara Mostafa", role: ROLES.ADMIN, employeeId: null },
+    profile: { id: "user-admin", name: "Nora Ahmed", role: ROLES.ADMIN, employeeId: null },
   },
   {
     username: "hr",
