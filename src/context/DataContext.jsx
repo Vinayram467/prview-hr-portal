@@ -4,6 +4,7 @@ import {
   seedAttendance,
   seedLeaves,
   seedPayroll,
+  seedTasks,
 } from "../data/mockData";
 
 const STORAGE_KEY = "hr-dashboard:data";
@@ -20,6 +21,7 @@ function loadInitialState() {
     attendance: seedAttendance,
     leaves: seedLeaves,
     payroll: seedPayroll,
+    tasks: seedTasks,
   };
 }
 
@@ -116,12 +118,35 @@ export function DataProvider({ children }) {
     }));
   }
 
+  // ---- Tasks ----
+  function addTask(task) {
+    const id = `tsk-${Date.now()}`;
+    const record = { ...task, id, status: "To Do", createdOn: new Date().toISOString().slice(0, 10) };
+    setState((s) => ({ ...s, tasks: [record, ...s.tasks] }));
+  }
+  function updateTask(id, patch) {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    }));
+  }
+  function deleteTask(id) {
+    setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
+  }
+  function updateTaskStatus(id, status) {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)),
+    }));
+  }
+
   function resetDemoData() {
     setState({
       employees: seedEmployees,
       attendance: seedAttendance,
       leaves: seedLeaves,
       payroll: seedPayroll,
+      tasks: seedTasks,
     });
   }
 
@@ -137,6 +162,10 @@ export function DataProvider({ children }) {
         requestLeave,
         updateLeaveStatus,
         updatePayroll,
+        addTask,
+        updateTask,
+        deleteTask,
+        updateTaskStatus,
         resetDemoData,
       }}
     >

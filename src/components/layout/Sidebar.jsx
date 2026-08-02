@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: "/employees", label: "Employees", icon: "👥", roles: [ROLES.ADMIN, ROLES.HR] },
   { to: "/attendance", label: "Attendance", icon: "🕒", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
   { to: "/leaves", label: "Leaves", icon: "📅", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
+  { to: "/tasks", label: "Tasks", icon: "✅", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
   { to: "/payroll", label: "Payroll", icon: "💰", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
   { to: "/reports", label: "Reports", icon: "📊", roles: [ROLES.ADMIN, ROLES.HR] },
   { to: "/settings", label: "Settings", icon: "⚙️", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },

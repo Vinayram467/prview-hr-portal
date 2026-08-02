@@ -52,6 +52,7 @@ src/
 - **Attendance** — check-in/out for employees, full team log with filters for Admin/HR
 - **Leaves** — request form for employees, approve/reject queue for Admin/HR
 - **Payroll** — editable (Admin), read-only (HR), own payslip only (Employee)
+- **Tasks** — Admin/HR assign, edit, and delete tasks for any employee; Employees see only their own tasks and update status (To Do / In Progress / Done)
 - **Reports** — headcount, attendance trend, payroll cost trend, leave breakdown
 - **Dark mode** — persisted, toggle in the top bar
 - **Responsive** — sidebar collapses into a mobile drawer under `lg` breakpoint

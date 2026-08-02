@@ -92,3 +92,21 @@ export const payrollTrend = [
   { month: "Jul", cost: 205400 },
   { month: "Aug", cost: 207000 },
 ];
+
+function inDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+export const seedTasks = [
+  { id: "tsk-001", title: "Prepare Q3 performance reviews", description: "Draft review forms for the engineering team ahead of the cycle.", employeeId: "emp-001", assignedBy: "Sara Mostafa", priority: "High", status: "In Progress", dueDate: inDays(3), createdOn: inDays(-4) },
+  { id: "tsk-002", title: "Fix onboarding checklist bug", description: "New hires aren't receiving the welcome email on day one.", employeeId: "emp-002", assignedBy: "Ahmed Samir", priority: "High", status: "To Do", dueDate: inDays(2), createdOn: inDays(-1) },
+  { id: "tsk-003", title: "Update sales pipeline dashboard", description: "Add the new enterprise deal stage to the CRM view.", employeeId: "emp-003", assignedBy: "Sara Mostafa", priority: "Medium", status: "To Do", dueDate: inDays(5), createdOn: inDays(-2) },
+  { id: "tsk-004", title: "Design social campaign assets", description: "Instagram and LinkedIn creatives for the August product launch.", employeeId: "emp-004", assignedBy: "Ahmed Samir", priority: "Medium", status: "In Progress", dueDate: inDays(4), createdOn: inDays(-3) },
+  { id: "tsk-005", title: "Reconcile July expense reports", description: "Cross-check submitted receipts against the finance ledger.", employeeId: "emp-005", assignedBy: "Sara Mostafa", priority: "Low", status: "Done", dueDate: inDays(-2), createdOn: inDays(-9) },
+  { id: "tsk-006", title: "Schedule benefits enrollment session", description: "Book a room and send calendar invites to all departments.", employeeId: "emp-006", assignedBy: "Sara Mostafa", priority: "Medium", status: "Done", dueDate: inDays(-1), createdOn: inDays(-6) },
+  { id: "tsk-007", title: "Redesign employee profile page", description: "Apply the new component library to the profile screen.", employeeId: "emp-007", assignedBy: "Ahmed Samir", priority: "Low", status: "To Do", dueDate: inDays(7), createdOn: inDays(-1) },
+  { id: "tsk-008", title: "Follow up with enterprise leads", description: "Send proposal follow-ups to the three leads from last week's demo.", employeeId: "emp-008", assignedBy: "Sara Mostafa", priority: "High", status: "In Progress", dueDate: inDays(1), createdOn: inDays(-5) },
+  { id: "tsk-009", title: "Plan Q4 hiring budget", description: "Draft headcount requests per department for next quarter.", employeeId: "emp-006", assignedBy: "Sara Mostafa", priority: "Low", status: "To Do", dueDate: inDays(10), createdOn: inDays(0) },
+];

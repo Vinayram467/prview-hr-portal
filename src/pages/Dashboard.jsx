@@ -11,10 +11,10 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { employees, attendance, leaves, payroll } = useData();
+  const { employees, attendance, leaves, payroll, tasks } = useData();
 
   if (user.role === ROLES.EMPLOYEE) {
-    return <EmployeeDashboard employeeId={user.employeeId} data={{ employees, attendance, leaves, payroll }} />;
+    return <EmployeeDashboard employeeId={user.employeeId} data={{ employees, attendance, leaves, payroll, tasks }} />;
   }
   return <AdminDashboard data={{ employees, attendance, leaves, payroll }} />;
 }
@@ -121,7 +121,7 @@ function AdminDashboard({ data }) {
 }
 
 function EmployeeDashboard({ employeeId, data }) {
-  const { employees, attendance, leaves, payroll } = data;
+  const { employees, attendance, leaves, payroll, tasks } = data;
   const me = employees.find((e) => e.id === employeeId);
   const today = todayStr();
   const todayRecord = attendance.find((a) => a.employeeId === employeeId && a.date === today);
@@ -129,6 +129,8 @@ function EmployeeDashboard({ employeeId, data }) {
   const pendingLeaves = myLeaves.filter((l) => l.status === "Pending").length;
   const approvedThisYear = myLeaves.filter((l) => l.status === "Approved").length;
   const myPayslip = payroll.find((p) => p.employeeId === employeeId);
+  const myTasks = tasks.filter((t) => t.employeeId === employeeId);
+  const openTasks = myTasks.filter((t) => t.status !== "Done").length;
 
   return (
     <div className="space-y-6">
@@ -145,8 +147,9 @@ function EmployeeDashboard({ employeeId, data }) {
         <Badge status={todayRecord?.status ?? "Absent"} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard label="Today's status" value={todayRecord?.checkIn ? `In at ${todayRecord.checkIn}` : "Not checked in"} />
+        <StatCard label="Open tasks" value={openTasks} />
         <StatCard label="Pending leave requests" value={pendingLeaves} />
         <StatCard label="Approved leaves (all time)" value={approvedThisYear} />
       </div>

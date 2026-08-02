@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import Attendance from "./pages/Attendance";
 import Leaves from "./pages/Leaves";
+import Tasks from "./pages/Tasks";
 import Payroll from "./pages/Payroll";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -36,6 +37,7 @@ export default function App() {
 
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/leaves" element={<Leaves />} />
+        <Route path="/tasks" element={<Tasks />} />
         <Route path="/payroll" element={<Payroll />} />
 
         <Route
