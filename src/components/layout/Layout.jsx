@@ -1,25 +1,23 @@
 import { useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import {
+  Outlet,
+  useLocation,
+} from "react-router-dom";
 
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-
 import { useAuth } from "../../context/AuthContext";
 
 const TITLES = {
   "/": "Dashboard",
   "/employees": "Employees",
   "/attendance": "Attendance",
-  "/breaks": "Breaks",
   "/leaves": "Leaves",
   "/tasks": "Tasks",
-  "/daily-report": "Daily Reports",
-  "/my-plans": "My Plans",
-  "/my-progress": "My Progress",
   "/payroll": "Payroll",
+  "/reports": "Reports",
   "/analytics": "Analytics",
   "/settings": "Settings",
-  "/reports": "Analytics",
 };
 
 export default function Layout() {
@@ -32,14 +30,16 @@ export default function Layout() {
 
   const title =
     TITLES[location.pathname] ??
-    "PRview Employee Portal";
+    "TalentFlow HR";
 
   return (
     <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
       <Sidebar
         role={user.role}
         open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={() =>
+          setSidebarOpen(false)
+        }
       />
 
       <div className="min-w-0 lg:pl-64">
