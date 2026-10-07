@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useData } from "../context/DataContext";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { DEPARTMENTS } from "../data/mockData";
@@ -19,7 +20,13 @@ const EMPTY_FORM = {
 
 export default function Employees() {
   const { user } = useAuth();
-  const { employees, addEmployee, updateEmployee, deleteEmployee } = useData();
+  const {
+    employees,
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+  } = useData();
+
   const canDelete = user.role === ROLES.ADMIN;
 
   const [query, setQuery] = useState("");
@@ -31,96 +38,177 @@ export default function Employees() {
 
   const filtered = useMemo(() => {
     return employees.filter((e) => {
+      const search = query.toLowerCase();
+
       const matchesQuery =
-        e.name.toLowerCase().includes(query.toLowerCase()) ||
-        e.role.toLowerCase().includes(query.toLowerCase());
-      const matchesDept = deptFilter === "All" || e.department === deptFilter;
+        e.name.toLowerCase().includes(search) ||
+        e.role.toLowerCase().includes(search) ||
+        e.email.toLowerCase().includes(search);
+
+      const matchesDept =
+        deptFilter === "All" || e.department === deptFilter;
+
       return matchesQuery && matchesDept;
     });
   }, [employees, query, deptFilter]);
 
   function openAdd() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      department: DEPARTMENTS[0] ?? "",
+    });
     setModalOpen(true);
   }
 
   function openEdit(emp) {
     setEditingId(emp.id);
-    setForm(emp);
+    setForm({ ...emp });
     setModalOpen(true);
   }
 
   function handleSubmit(e) {
     e.preventDefault();
+
     if (editingId) {
       updateEmployee(editingId, form);
     } else {
       addEmployee(form);
     }
+
     setModalOpen(false);
   }
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-3">
-          <input
-            className="input max-w-xs"
-            placeholder="Search by name or role..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select className="input max-w-[180px]" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-            <option value="All">All departments</option>
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+        <div>
+          <h2 className="font-display text-xl font-semibold text-ink-900 dark:text-white">
+            Employees
+          </h2>
+
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            Manage employees and open individual employee profiles.
+          </p>
         </div>
-        <button className="btn-primary" onClick={openAdd}>+ Add employee</button>
+
+        <button className="btn-primary" onClick={openAdd}>
+          + Add employee
+        </button>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <input
+          className="input max-w-xs"
+          placeholder="Search by name, role or email..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+
+        <select
+          className="input max-w-[180px]"
+          value={deptFilter}
+          onChange={(e) => setDeptFilter(e.target.value)}
+        >
+          <option value="All">All departments</option>
+
+          {DEPARTMENTS.map((department) => (
+            <option key={department} value={department}>
+              {department}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Employee table */}
       <div className="card overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="text-left text-xs text-ink-400 border-b border-ink-100 dark:border-ink-800">
+            <tr className="border-b border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
               <th className="p-4 font-medium">Employee</th>
               <th className="p-4 font-medium">Department</th>
               <th className="p-4 font-medium">Email</th>
               <th className="p-4 font-medium">Join date</th>
               <th className="p-4 font-medium">Status</th>
-              <th className="p-4 font-medium text-right">Actions</th>
+              <th className="p-4 text-right font-medium">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {filtered.map((emp) => (
-              <tr key={emp.id} className="border-b border-ink-50 dark:border-ink-800/60 last:border-0">
+              <tr
+                key={emp.id}
+                className="border-b border-ink-50 last:border-0 dark:border-ink-800/60"
+              >
                 <td className="p-4">
                   <div className="flex items-center gap-3">
                     <span
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-white text-xs font-semibold"
-                      style={{ backgroundColor: emp.avatarColor }}
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold text-white"
+                      style={{
+                        backgroundColor:
+                          emp.avatarColor || "#7C3AED",
+                      }}
                     >
-                      {emp.name.split(" ").map((n) => n[0]).join("")}
+                      {emp.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </span>
+
                     <div>
-                      <p className="font-medium text-ink-800 dark:text-ink-100">{emp.name}</p>
-                      <p className="text-xs text-ink-400">{emp.role}</p>
+                      <p className="font-medium text-ink-800 dark:text-ink-100">
+                        {emp.name}
+                      </p>
+
+                      <p className="text-xs text-ink-400">
+                        {emp.role}
+                      </p>
                     </div>
                   </div>
                 </td>
-                <td className="p-4 text-ink-600 dark:text-ink-300">{emp.department}</td>
-                <td className="p-4 text-ink-600 dark:text-ink-300">{emp.email}</td>
-                <td className="p-4 text-ink-600 dark:text-ink-300">{emp.joinDate}</td>
-                <td className="p-4"><Badge status={emp.status} /></td>
+
+                <td className="p-4 text-ink-600 dark:text-ink-300">
+                  {emp.department}
+                </td>
+
+                <td className="p-4 text-ink-600 dark:text-ink-300">
+                  {emp.email}
+                </td>
+
+                <td className="p-4 text-ink-600 dark:text-ink-300">
+                  {emp.joinDate}
+                </td>
+
+                <td className="p-4">
+                  <Badge status={emp.status} />
+                </td>
+
                 <td className="p-4">
                   <div className="flex items-center justify-end gap-2">
-                    <button className="btn-ghost !px-2 !py-1 text-xs" onClick={() => openEdit(emp)}>Edit</button>
+                    <Link
+                      to={`/employees/${emp.id}`}
+                      className="btn-primary !px-3 !py-1.5 text-xs"
+                    >
+                      View
+                    </Link>
+
+                    <button
+                      className="btn-ghost !px-3 !py-1.5 text-xs"
+                      onClick={() => openEdit(emp)}
+                    >
+                      Edit
+                    </button>
+
                     {canDelete && (
                       <button
-                        className="btn-ghost !px-2 !py-1 text-xs text-red-600"
-                        onClick={() => setConfirmDeleteId(emp.id)}
+                        className="btn-ghost !px-3 !py-1.5 text-xs text-red-600"
+                        onClick={() =>
+                          setConfirmDeleteId(emp.id)
+                        }
                       >
                         Delete
                       </button>
@@ -129,9 +217,13 @@ export default function Employees() {
                 </td>
               </tr>
             ))}
+
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-ink-400 text-sm">
+                <td
+                  colSpan={6}
+                  className="p-8 text-center text-sm text-ink-400"
+                >
                   No employees match your filters.
                 </td>
               </tr>
@@ -140,76 +232,195 @@ export default function Employees() {
         </table>
       </div>
 
+      {/* Add / Edit modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editingId ? "Edit employee" : "Add employee"}
         footer={
           <>
-            <button className="btn-outline" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button className="btn-primary" type="submit" form="employee-form">
+            <button
+              className="btn-outline"
+              onClick={() => setModalOpen(false)}
+            >
+              Cancel
+            </button>
+
+            <button
+              className="btn-primary"
+              type="submit"
+              form="employee-form"
+            >
               {editingId ? "Save changes" : "Add employee"}
             </button>
           </>
         }
       >
-        <form id="employee-form" onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+        <form
+          id="employee-form"
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Full name</label>
-              <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+
+              <input
+                className="input"
+                required
+                value={form.name}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                  })
+                }
+              />
             </div>
+
             <div>
               <label className="label">Job title</label>
-              <input className="input" required value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} />
+
+              <input
+                className="input"
+                required
+                value={form.role}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    role: e.target.value,
+                  })
+                }
+              />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Department</label>
-              <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+
+              <select
+                className="input"
+                value={form.department}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    department: e.target.value,
+                  })
+                }
+              >
+                {DEPARTMENTS.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
               </select>
             </div>
+
             <div>
               <label className="label">Status</label>
-              <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+
+              <select
+                className="input"
+                value={form.status}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    status: e.target.value,
+                  })
+                }
+              >
                 <option>Active</option>
                 <option>On Leave</option>
                 <option>Inactive</option>
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Email</label>
-              <input type="email" className="input" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+
+              <input
+                type="email"
+                className="input"
+                required
+                value={form.email}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    email: e.target.value,
+                  })
+                }
+              />
             </div>
+
             <div>
               <label className="label">Phone</label>
-              <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+
+              <input
+                className="input"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    phone: e.target.value,
+                  })
+                }
+              />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label">Join date</label>
-              <input type="date" className="input" value={form.joinDate} onChange={(e) => setForm({ ...form, joinDate: e.target.value })} />
+
+              <input
+                type="date"
+                className="input"
+                value={form.joinDate}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    joinDate: e.target.value,
+                  })
+                }
+              />
             </div>
+
             <div>
-              <label className="label">Base salary (EGP)</label>
-              <input type="number" className="input" value={form.salary} onChange={(e) => setForm({ ...form, salary: Number(e.target.value) })} />
+              <label className="label">Base salary</label>
+
+              <input
+                type="number"
+                className="input"
+                value={form.salary}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    salary: Number(e.target.value),
+                  })
+                }
+              />
             </div>
           </div>
         </form>
       </Modal>
 
+      {/* Delete confirmation */}
       <Modal
         open={!!confirmDeleteId}
         onClose={() => setConfirmDeleteId(null)}
         title="Remove employee?"
         footer={
           <>
-            <button className="btn-outline" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+            <button
+              className="btn-outline"
+              onClick={() => setConfirmDeleteId(null)}
+            >
+              Cancel
+            </button>
+
             <button
               className="btn-danger"
               onClick={() => {
@@ -223,7 +434,8 @@ export default function Employees() {
         }
       >
         <p className="text-sm text-ink-600 dark:text-ink-300">
-          This removes the employee record from this demo dataset. This can't be undone.
+          This removes the employee record from this demo dataset.
+          This can't be undone.
         </p>
       </Modal>
     </div>

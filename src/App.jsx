@@ -8,6 +8,7 @@ import { ROLES } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
+import EmployeeDetails from "./pages/EmployeeDetails";
 import Attendance from "./pages/Attendance";
 import Breaks from "./pages/Breaks";
 import Leaves from "./pages/Leaves";
@@ -22,14 +23,10 @@ import Settings from "./pages/Settings";
 export default function App() {
   return (
     <Routes>
-      {/* =====================================================
-          LOGIN
-      ====================================================== */}
+      {/* Login */}
       <Route path="/login" element={<Login />} />
 
-      {/* =====================================================
-          PROTECTED APPLICATION
-      ====================================================== */}
+      {/* Protected application */}
       <Route
         element={
           <ProtectedRoute>
@@ -37,14 +34,10 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* ===================================================
-            DASHBOARD
-        ==================================================== */}
+        {/* Dashboard */}
         <Route path="/" element={<Dashboard />} />
 
-        {/* ===================================================
-            EMPLOYEES
-        ==================================================== */}
+        {/* Employees */}
         <Route
           path="/employees"
           element={
@@ -56,74 +49,52 @@ export default function App() {
           }
         />
 
-        {/* ===================================================
-            ATTENDANCE
-        ==================================================== */}
+        {/* Individual employee */}
         <Route
-          path="/attendance"
-          element={<Attendance />}
+          path="/employees/:employeeId"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN, ROLES.HR]}
+            >
+              <EmployeeDetails />
+            </ProtectedRoute>
+          }
         />
 
-        {/* ===================================================
-            BREAKS
-        ==================================================== */}
-        <Route
-          path="/breaks"
-          element={<Breaks />}
-        />
+        {/* Attendance */}
+        <Route path="/attendance" element={<Attendance />} />
 
-        {/* ===================================================
-            LEAVES
-        ==================================================== */}
-        <Route
-          path="/leaves"
-          element={<Leaves />}
-        />
+        {/* Breaks */}
+        <Route path="/breaks" element={<Breaks />} />
 
-        {/* ===================================================
-            TASKS
-        ==================================================== */}
-        <Route
-          path="/tasks"
-          element={<Tasks />}
-        />
+        {/* Leaves */}
+        <Route path="/leaves" element={<Leaves />} />
 
-        {/* ===================================================
-            DAILY REPORTS
-        ==================================================== */}
+        {/* Tasks */}
+        <Route path="/tasks" element={<Tasks />} />
+
+        {/* Daily reports */}
         <Route
           path="/daily-report"
           element={<DailyReport />}
         />
 
-        {/* ===================================================
-            MY PLANS
-        ==================================================== */}
+        {/* Employee planning */}
         <Route
           path="/my-plans"
           element={<MyPlans />}
         />
 
-        {/* ===================================================
-            MY PROGRESS
-        ==================================================== */}
+        {/* Employee progress */}
         <Route
           path="/my-progress"
           element={<MyProgress />}
         />
 
-        {/* ===================================================
-            PAYROLL
-        ==================================================== */}
-        <Route
-          path="/payroll"
-          element={<Payroll />}
-        />
+        {/* Payroll */}
+        <Route path="/payroll" element={<Payroll />} />
 
-        {/* ===================================================
-            ANALYTICS
-            ADMIN / HR ONLY
-        ==================================================== */}
+        {/* Analytics */}
         <Route
           path="/analytics"
           element={
@@ -135,18 +106,10 @@ export default function App() {
           }
         />
 
-        {/* ===================================================
-            SETTINGS
-        ==================================================== */}
-        <Route
-          path="/settings"
-          element={<Settings />}
-        />
+        {/* Settings */}
+        <Route path="/settings" element={<Settings />} />
 
-        {/* ===================================================
-            OLD REPORTS URL
-            Keep old bookmarks working.
-        ==================================================== */}
+        {/* Old route kept for compatibility */}
         <Route
           path="/reports"
           element={
@@ -162,9 +125,7 @@ export default function App() {
         />
       </Route>
 
-      {/* =====================================================
-          FALLBACK
-      ====================================================== */}
+      {/* Unknown route */}
       <Route
         path="*"
         element={<Navigate to="/" replace />}
