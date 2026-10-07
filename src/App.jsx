@@ -1,4 +1,8 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 import Layout from "./components/layout/Layout";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
@@ -23,10 +27,11 @@ import Settings from "./pages/Settings";
 export default function App() {
   return (
     <Routes>
-      {/* Login */}
-      <Route path="/login" element={<Login />} />
+      <Route
+        path="/login"
+        element={<Login />}
+      />
 
-      {/* Protected application */}
       <Route
         element={
           <ProtectedRoute>
@@ -34,87 +39,107 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* Dashboard */}
-        <Route path="/" element={<Dashboard />} />
+        <Route
+          path="/"
+          element={<Dashboard />}
+        />
 
-        {/* Employees */}
         <Route
           path="/employees"
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR]}
+              allowedRoles={[
+                ROLES.ADMIN,
+                ROLES.HR,
+              ]}
             >
               <Employees />
             </ProtectedRoute>
           }
         />
 
-        {/* Individual employee */}
         <Route
           path="/employees/:employeeId"
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR]}
+              allowedRoles={[
+                ROLES.ADMIN,
+                ROLES.HR,
+              ]}
             >
               <EmployeeDetails />
             </ProtectedRoute>
           }
         />
 
-        {/* Attendance */}
-        <Route path="/attendance" element={<Attendance />} />
+        <Route
+          path="/attendance"
+          element={<Attendance />}
+        />
 
-        {/* Breaks */}
-        <Route path="/breaks" element={<Breaks />} />
+        <Route
+          path="/breaks"
+          element={<Breaks />}
+        />
 
-        {/* Leaves */}
-        <Route path="/leaves" element={<Leaves />} />
+        <Route
+          path="/leaves"
+          element={<Leaves />}
+        />
 
-        {/* Tasks */}
-        <Route path="/tasks" element={<Tasks />} />
+        <Route
+          path="/tasks"
+          element={<Tasks />}
+        />
 
-        {/* Daily reports */}
         <Route
           path="/daily-report"
           element={<DailyReport />}
         />
 
-        {/* Employee planning */}
         <Route
           path="/my-plans"
           element={<MyPlans />}
         />
 
-        {/* Employee progress */}
         <Route
           path="/my-progress"
           element={<MyProgress />}
         />
 
-        {/* Payroll */}
-        <Route path="/payroll" element={<Payroll />} />
+        <Route
+          path="/payroll"
+          element={<Payroll />}
+        />
 
-        {/* Analytics */}
         <Route
           path="/analytics"
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR]}
+              allowedRoles={[
+                ROLES.ADMIN,
+                ROLES.HR,
+              ]}
             >
               <Analytics />
             </ProtectedRoute>
           }
         />
 
-        {/* Settings */}
-        <Route path="/settings" element={<Settings />} />
+        <Route
+          path="/settings"
+          element={<Settings />}
+        />
 
         {/* Old route kept for compatibility */}
         <Route
           path="/reports"
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR]}
+              allowedRoles={[
+                ROLES.ADMIN,
+                ROLES.HR,
+              ]}
             >
               <Navigate
                 to="/analytics"
@@ -125,10 +150,14 @@ export default function App() {
         />
       </Route>
 
-      {/* Unknown route */}
       <Route
         path="*"
-        element={<Navigate to="/" replace />}
+        element={
+          <Navigate
+            to="/"
+            replace
+          />
+        }
       />
     </Routes>
   );

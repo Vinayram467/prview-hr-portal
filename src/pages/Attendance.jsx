@@ -1,1085 +1,638 @@
-import {
-  useMemo,
-  useState,
-} from "react";
-
-import {
-  useAuth,
-  ROLES,
-} from "../context/AuthContext";
-
-import {
-  useData,
-} from "../context/DataContext";
-
+import { useMemo, useState } from "react";
+import { useAuth, ROLES } from "../context/AuthContext";
+import { useData } from "../context/DataContext";
 import Badge from "../components/ui/Badge";
 
-
-function todayStr() {
-
-  const now =
-    new Date();
-
-  const year =
-    now.getFullYear();
-
-  const month =
-    String(
-      now.getMonth() + 1
-    ).padStart(2, "0");
-
-  const day =
-    String(
-      now.getDate()
-    ).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+function localDate() {
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 }
 
+function timeToMinutes(time) {
+  if (!time) return null;
 
-function formatTime(time) {
+  const [hours, minutes] = time.split(":").map(Number);
 
-  if (!time) {
-    return "—";
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
   }
 
-  const [
-    hours,
-    minutes,
-  ] = time.split(":");
-
-
-  const date =
-    new Date();
-
-  date.setHours(
-    Number(hours),
-    Number(minutes)
-  );
-
-
-  return date.toLocaleTimeString(
-    [],
-    {
-      hour: "numeric",
-      minute: "2-digit",
-    }
-  );
+  return hours * 60 + minutes;
 }
 
+function minutesBetween(start, end) {
+  const startMinutes = timeToMinutes(start);
+  const endMinutes = timeToMinutes(end);
 
-function formatDuration(
-  minutes
-) {
-
-  if (
-    minutes === null ||
-    minutes === undefined ||
-    minutes <= 0
-  ) {
-    return "0m";
-  }
-
-
-  const hours =
-    Math.floor(
-      minutes / 60
-    );
-
-  const remaining =
-    minutes % 60;
-
-
-  if (hours === 0) {
-    return `${remaining}m`;
-  }
-
-
-  return `${hours}h ${remaining}m`;
-}
-
-
-function getBreakMinutes(
-  record
-) {
-
-  if (
-    !record?.breaks?.length
-  ) {
+  if (startMinutes === null || endMinutes === null) {
     return 0;
   }
 
+  let difference = endMinutes - startMinutes;
 
-  const now =
-    new Date();
+  // Handles crossing midnight.
+  if (difference < 0) {
+    difference += 24 * 60;
+  }
 
-  const currentMinutes =
-    now.getHours() * 60 +
-    now.getMinutes();
-
-
-  return record.breaks.reduce(
-    (
-      total,
-      breakItem
-    ) => {
-
-      if (!breakItem.start) {
-        return total;
-      }
-
-
-      const [
-        startHour,
-        startMinute,
-      ] =
-        breakItem.start
-          .split(":")
-          .map(Number);
-
-
-      const start =
-        startHour * 60 +
-        startMinute;
-
-
-      let end;
-
-
-      if (breakItem.end) {
-
-        const [
-          endHour,
-          endMinute,
-        ] =
-          breakItem.end
-            .split(":")
-            .map(Number);
-
-
-        end =
-          endHour * 60 +
-          endMinute;
-
-      } else {
-
-        end =
-          currentMinutes;
-      }
-
-
-      return (
-        total +
-        Math.max(
-          0,
-          end - start
-        )
-      );
-    },
-    0
-  );
+  return difference;
 }
 
+function formatDuration(totalMinutes) {
+  if (!totalMinutes || totalMinutes <= 0) {
+    return "0m";
+  }
 
-function getWorkingMinutes(
-  record
-) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
+}
+
+function formatTime(time) {
+  if (!time) return "—";
+
+  const [hour, minute] = time.split(":");
+  const date = new Date();
+
+  date.setHours(Number(hour), Number(minute), 0, 0);
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getBreakMinutes(breaks, employeeId, date) {
+  return breaks
+    .filter(
+      (item) =>
+        item.employeeId === employeeId &&
+        item.date === date
+    )
+    .reduce((total, item) => {
+      if (!item.start) return total;
+
+      const end = item.end || currentTime();
+
+      return total + minutesBetween(item.start, end);
+    }, 0);
+}
+
+function currentTime() {
+  const now = new Date();
+
+  return now.toTimeString().slice(0, 5);
+}
+
+function getWorkingMinutes(record, breaks) {
   if (!record?.checkIn) {
     return 0;
   }
 
+  const endTime = record.checkOut || currentTime();
 
-  const [
-    startHour,
-    startMinute,
-  ] =
-    record.checkIn
-      .split(":")
-      .map(Number);
+  const totalMinutes = minutesBetween(
+    record.checkIn,
+    endTime
+  );
 
+  const breakMinutes = getBreakMinutes(
+    breaks,
+    record.employeeId,
+    record.date
+  );
 
-  const start =
-    startHour * 60 +
-    startMinute;
+  return Math.max(totalMinutes - breakMinutes, 0);
+}
 
-
-  let end;
-
-
-  if (record.checkOut) {
-
-    const [
-      endHour,
-      endMinute,
-    ] =
-      record.checkOut
-        .split(":")
-        .map(Number);
-
-
-    end =
-      endHour * 60 +
-      endMinute;
-
-  } else {
-
-    const now =
-      new Date();
-
-    end =
-      now.getHours() * 60 +
-      now.getMinutes();
-  }
-
-
-  const elapsed =
-    Math.max(
-      0,
-      end - start
-    );
-
-
-  const breakMinutes =
-    getBreakMinutes(
-      record
-    );
-
-
-  return Math.max(
-    0,
-    elapsed - breakMinutes
+function getActiveBreak(breaks, employeeId, date) {
+  return breaks.find(
+    (item) =>
+      item.employeeId === employeeId &&
+      item.date === date &&
+      item.start &&
+      !item.end
   );
 }
 
+function getEmployeeStatus(record, activeBreak) {
+  if (!record?.checkIn) {
+    return "Not Started";
+  }
 
-export default function Attendance() {
+  if (activeBreak) {
+    return "On Break";
+  }
 
-  const {
-    user,
-  } = useAuth();
+  if (record.checkOut) {
+    return "Completed";
+  }
 
+  return "Working";
+}
 
-  const {
-    employees,
-    attendance,
-    checkIn,
-    checkOut,
-    startBreak,
-    endBreak,
-  } = useData();
-
-
-  const [
-    employeeFilter,
-    setEmployeeFilter,
-  ] = useState("All");
-
-
-  const [
-    statusFilter,
-    setStatusFilter,
-  ] = useState("All");
-
-
-  const isEmployee =
-    user?.role ===
-    ROLES.EMPLOYEE;
-
-
-  const today =
-    todayStr();
-
-
-  const myRecord =
-    isEmployee
-      ? attendance.find(
-          (record) =>
-            record.employeeId ===
-              user.employeeId &&
-            record.date === today
-        )
-      : null;
-
-
-  // ====================================================
-  // ATTENDANCE LIST
-  // ====================================================
-
-  const rows =
-    useMemo(() => {
-
-      let list =
-        isEmployee
-          ? attendance.filter(
-              (record) =>
-                record.employeeId ===
-                user.employeeId
-            )
-          : attendance;
-
-
-      if (!isEmployee) {
-
-        if (
-          employeeFilter !==
-          "All"
-        ) {
-
-          list =
-            list.filter(
-              (record) =>
-                record.employeeId ===
-                employeeFilter
-            );
-        }
-
-
-        if (
-          statusFilter !==
-          "All"
-        ) {
-
-          list =
-            list.filter(
-              (record) =>
-                record.status ===
-                statusFilter
-            );
-        }
-      }
-
-
-      return [
-        ...list,
-      ]
-        .sort(
-          (a, b) =>
-            a.date < b.date
-              ? 1
-              : -1
-        )
-        .slice(0, 60);
-
-    }, [
-      attendance,
-      isEmployee,
-      user.employeeId,
-      employeeFilter,
-      statusFilter,
-    ]);
-
-
-  const isWorking =
-    myRecord?.checkIn &&
-    !myRecord?.checkOut &&
-    myRecord?.workStatus !==
-      "On Break";
-
-
-  const isOnBreak =
-    myRecord?.workStatus ===
-    "On Break";
-
-
-  const isCompleted =
-    !!myRecord?.checkOut;
-
-
-  const breakMinutes =
-    getBreakMinutes(
-      myRecord
-    );
-
-
-  const workingMinutes =
-    getWorkingMinutes(
-      myRecord
-    );
-
+function StatusPill({ status }) {
+  const styles = {
+    Working:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    "On Break":
+      "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    Completed:
+      "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    "Not Started":
+      "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300",
+  };
 
   return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+        styles[status] || styles["Not Started"]
+      }`}
+    >
+      {status}
+    </span>
+  );
+}
 
-    <div className="space-y-6">
+export default function Attendance() {
+  const { user } = useAuth();
 
+  const {
+    employees = [],
+    attendance = [],
+    breaks = [],
+    checkIn,
+    checkOut,
+  } = useData();
 
-      {/* ==================================================
-          EMPLOYEE TODAY
-         ================================================== */}
+  const [employeeFilter, setEmployeeFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
-      {isEmployee && (
+  const isSelf = user.role === ROLES.EMPLOYEE;
+  const today = localDate();
 
+  const myRecord = isSelf
+    ? attendance.find(
+        (record) =>
+          record.employeeId === user.employeeId &&
+          record.date === today
+      )
+    : null;
+
+  const myActiveBreak = isSelf
+    ? getActiveBreak(
+        breaks,
+        user.employeeId,
+        today
+      )
+    : null;
+
+  const myBreakMinutes = isSelf
+    ? getBreakMinutes(
+        breaks,
+        user.employeeId,
+        today
+      )
+    : 0;
+
+  const myWorkingMinutes = isSelf
+    ? getWorkingMinutes(myRecord, breaks)
+    : 0;
+
+  const myStatus = isSelf
+    ? getEmployeeStatus(
+        myRecord,
+        myActiveBreak
+      )
+    : null;
+
+  const rows = useMemo(() => {
+    let list = isSelf
+      ? attendance.filter(
+          (record) =>
+            record.employeeId === user.employeeId
+        )
+      : attendance;
+
+    if (!isSelf) {
+      if (employeeFilter !== "All") {
+        list = list.filter(
+          (record) =>
+            record.employeeId === employeeFilter
+        );
+      }
+
+      if (statusFilter !== "All") {
+        list = list.filter(
+          (record) =>
+            getEmployeeStatus(
+              record,
+              getActiveBreak(
+                breaks,
+                record.employeeId,
+                record.date
+              )
+            ) === statusFilter
+        );
+      }
+    }
+
+    return [...list]
+      .sort((a, b) => {
+        if (a.date !== b.date) {
+          return a.date < b.date ? 1 : -1;
+        }
+
+        if (!a.checkIn) return 1;
+        if (!b.checkIn) return -1;
+
+        return a.checkIn.localeCompare(b.checkIn);
+      })
+      .slice(0, 100);
+  }, [
+    attendance,
+    breaks,
+    isSelf,
+    user.employeeId,
+    employeeFilter,
+    statusFilter,
+  ]);
+
+  function handleCheckOut() {
+    if (myActiveBreak) {
+      return;
+    }
+
+    checkOut(user.employeeId);
+  }
+
+  return (
+    <div className="space-y-5">
+      {isSelf && (
         <>
+          {/* Today's Attendance */}
+          <section className="card p-5">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm text-ink-500 dark:text-ink-400">
+                  Today, {today}
+                </p>
 
-          {/* Main attendance card */}
+                <h2 className="mt-1 font-display text-xl font-semibold text-ink-900 dark:text-white">
+                  {myStatus}
+                </h2>
 
-          <section className="card p-6">
+                <p className="mt-1 text-sm text-ink-400">
+                  {myRecord?.checkIn
+                    ? `Started at ${formatTime(
+                        myRecord.checkIn
+                      )}`
+                    : "You haven't checked in yet"}
+                </p>
 
-            <div className="flex flex-col gap-6">
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-
-                <div>
-
-                  <p className="text-sm text-ink-400">
-                    Today · {today}
+                {myRecord?.checkOut && (
+                  <p className="mt-1 text-xs text-ink-400">
+                    Checked out at{" "}
+                    {formatTime(myRecord.checkOut)}
                   </p>
-
-                  <h2 className="mt-1 font-display text-2xl font-semibold text-ink-900 dark:text-white">
-
-                    {isOnBreak
-                      ? "You're on break"
-                      : isWorking
-                      ? "You're currently working"
-                      : isCompleted
-                      ? "Workday completed"
-                      : "You haven't checked in yet"}
-
-                  </h2>
-
-                </div>
-
-
-                <span
-                  className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    isOnBreak
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                      : isWorking
-                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                      : isCompleted
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                      : "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300"
-                  }`}
-                >
-
-                  {isOnBreak
-                    ? "On Break"
-                    : isWorking
-                    ? "Working"
-                    : isCompleted
-                    ? "Completed"
-                    : "Not Started"}
-
-                </span>
-
+                )}
               </div>
 
+              <div className="flex flex-wrap gap-3">
+                {!myRecord?.checkIn && (
+                  <button
+                    className="btn-primary"
+                    onClick={() =>
+                      checkIn(user.employeeId)
+                    }
+                  >
+                    ✓ Clock In
+                  </button>
+                )}
 
-              {/* Metrics */}
+                {myRecord?.checkIn &&
+                  !myRecord?.checkOut && (
+                    <button
+                      className="btn-outline"
+                      disabled={!!myActiveBreak}
+                      onClick={handleCheckOut}
+                    >
+                      {myActiveBreak
+                        ? "End break first"
+                        : "Clock Out"}
+                    </button>
+                  )}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-
-                <div className="rounded-xl bg-ink-50 p-4 dark:bg-ink-800/60">
-
-                  <p className="text-xs text-ink-400">
-                    Login time
-                  </p>
-
-                  <p className="mt-1 text-xl font-semibold text-ink-900 dark:text-white">
-                    {formatTime(
-                      myRecord?.checkIn
-                    )}
-                  </p>
-
-                </div>
-
-
-                <div className="rounded-xl bg-ink-50 p-4 dark:bg-ink-800/60">
-
-                  <p className="text-xs text-ink-400">
-                    Logout time
-                  </p>
-
-                  <p className="mt-1 text-xl font-semibold text-ink-900 dark:text-white">
-                    {formatTime(
-                      myRecord?.checkOut
-                    )}
-                  </p>
-
-                </div>
-
-
-                <div className="rounded-xl bg-ink-50 p-4 dark:bg-ink-800/60">
-
-                  <p className="text-xs text-ink-400">
-                    Working time
-                  </p>
-
-                  <p className="mt-1 text-xl font-semibold text-ink-900 dark:text-white">
-                    {formatDuration(
-                      workingMinutes
-                    )}
-                  </p>
-
-                </div>
-
+                {myRecord?.checkOut && (
+                  <span className="rounded-lg bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    Workday completed ✓
+                  </span>
+                )}
               </div>
-
-
-              {/* Break information */}
-
-              <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
-
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-                  <div>
-
-                    <p className="text-xs text-ink-400">
-                      Total break time
-                    </p>
-
-                    <p className="mt-1 text-lg font-semibold text-ink-900 dark:text-white">
-                      {formatDuration(
-                        breakMinutes
-                      )}
-                    </p>
-
-                  </div>
-
-
-                  <div className="flex flex-wrap gap-3">
-
-                    {/* Clock in */}
-
-                    {!myRecord?.checkIn && (
-
-                      <button
-                        className="btn-primary"
-                        onClick={() =>
-                          checkIn(
-                            user.employeeId
-                          )
-                        }
-                      >
-                        ✓ Clock In
-                      </button>
-
-                    )}
-
-
-                    {/* Start break */}
-
-                    {isWorking && (
-
-                      <button
-                        className="btn-primary"
-                        onClick={() =>
-                          startBreak(
-                            user.employeeId
-                          )
-                        }
-                      >
-                        ☕ Start Break
-                      </button>
-
-                    )}
-
-
-                    {/* End break */}
-
-                    {isOnBreak && (
-
-                      <button
-                        className="btn-primary"
-                        onClick={() =>
-                          endBreak(
-                            user.employeeId
-                          )
-                        }
-                      >
-                        ↩ Back to Work
-                      </button>
-
-                    )}
-
-
-                    {/* Clock out */}
-
-                    {isWorking && (
-
-                      <button
-                        className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:bg-ink-900 dark:text-red-400 dark:hover:bg-red-950"
-                        onClick={() =>
-                          checkOut(
-                            user.employeeId
-                          )
-                        }
-                      >
-                        Clock Out
-                      </button>
-
-                    )}
-
-
-                    {/* Completed */}
-
-                    {isCompleted && (
-
-                      <span className="rounded-lg bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                        ✓ Workday completed
-                      </span>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-              </div>
-
             </div>
-
           </section>
 
-
-          {/* =================================================
-              BREAK HISTORY
-             ================================================= */}
-
-          <section className="card p-6">
-
-            <div className="mb-5">
-
-              <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-                Today's Breaks
-              </h3>
-
-              <p className="mt-1 text-xs text-ink-400">
-                Your break history for today.
+          {/* Today's Work Summary */}
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="card p-5">
+              <p className="text-sm text-ink-500 dark:text-ink-400">
+                Login
               </p>
 
+              <p className="mt-2 text-xl font-semibold text-ink-900 dark:text-white">
+                {formatTime(myRecord?.checkIn)}
+              </p>
             </div>
 
+            <div className="card p-5">
+              <p className="text-sm text-ink-500 dark:text-ink-400">
+                Break Time
+              </p>
 
-            <div className="space-y-3">
-
-              {myRecord?.breaks?.map(
-                (
-                  breakItem,
-                  index
-                ) => {
-
-                  const start =
-                    breakItem.start;
-
-                  const end =
-                    breakItem.end;
-
-
-                  let duration =
-                    0;
-
-
-                  if (start) {
-
-                    const [
-                      sh,
-                      sm,
-                    ] =
-                      start
-                        .split(":")
-                        .map(Number);
-
-
-                    const startMinutes =
-                      sh * 60 + sm;
-
-
-                    let endMinutes;
-
-
-                    if (end) {
-
-                      const [
-                        eh,
-                        em,
-                      ] =
-                        end
-                          .split(":")
-                          .map(Number);
-
-
-                      endMinutes =
-                        eh * 60 + em;
-
-                    } else {
-
-                      const now =
-                        new Date();
-
-                      endMinutes =
-                        now.getHours() *
-                          60 +
-                        now.getMinutes();
-                    }
-
-
-                    duration =
-                      Math.max(
-                        0,
-                        endMinutes -
-                          startMinutes
-                      );
-                  }
-
-
-                  return (
-
-                    <div
-                      key={
-                        breakItem.id ||
-                        index
-                      }
-                      className="flex flex-col gap-3 rounded-xl border border-ink-100 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-ink-800"
-                    >
-
-                      <div className="flex items-center gap-3">
-
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950">
-                          ☕
-                        </div>
-
-                        <div>
-
-                          <p className="text-sm font-medium text-ink-800 dark:text-ink-100">
-                            Break{" "}
-                            {index + 1}
-                          </p>
-
-                          <p className="text-xs text-ink-400">
-
-                            {formatTime(
-                              breakItem.start
-                            )}
-
-                            {" → "}
-
-                            {breakItem.end
-                              ? formatTime(
-                                  breakItem.end
-                                )
-                              : "In progress"}
-
-                          </p>
-
-                        </div>
-
-                      </div>
-
-
-                      <span className="text-sm font-semibold text-ink-700 dark:text-ink-200">
-
-                        {formatDuration(
-                          duration
-                        )}
-
-                      </span>
-
-                    </div>
-
-                  );
-                }
-              )}
-
-
-              {!myRecord?.breaks
-                ?.length && (
-
-                <div className="rounded-xl bg-ink-50 p-8 text-center dark:bg-ink-800/50">
-
-                  <p className="text-sm text-ink-400">
-                    No breaks recorded today.
-                  </p>
-
-                </div>
-
-              )}
-
+              <p className="mt-2 text-xl font-semibold text-amber-600">
+                {formatDuration(myBreakMinutes)}
+              </p>
             </div>
 
+            <div className="card p-5">
+              <p className="text-sm text-ink-500 dark:text-ink-400">
+                Working Time
+              </p>
+
+              <p className="mt-2 text-xl font-semibold text-emerald-600">
+                {formatDuration(myWorkingMinutes)}
+              </p>
+            </div>
           </section>
 
-        </>
+          {/* Current Break */}
+          {myActiveBreak && (
+            <section className="card border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900 dark:bg-amber-950/30">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                    Currently on break
+                  </p>
 
+                  <p className="mt-1 font-semibold text-ink-900 dark:text-white">
+                    {myActiveBreak.reason || "Break"}
+                  </p>
+
+                  {myActiveBreak.location && (
+                    <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                      Location: {myActiveBreak.location}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <p className="text-xs text-ink-400">
+                    Started
+                  </p>
+
+                  <p className="font-semibold text-amber-700 dark:text-amber-300">
+                    {formatTime(myActiveBreak.start)}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+        </>
       )}
 
-
-      {/* ==================================================
-          ADMIN / HR FILTERS
-         ================================================== */}
-
-      {!isEmployee && (
-
+      {/* Admin / HR Filters */}
+      {!isSelf && (
         <div className="flex flex-wrap gap-3">
-
           <select
-            className="input max-w-[220px]"
-            value={
-              employeeFilter
-            }
+            className="input max-w-[240px]"
+            value={employeeFilter}
             onChange={(e) =>
-              setEmployeeFilter(
-                e.target.value
-              )
+              setEmployeeFilter(e.target.value)
             }
           >
-
             <option value="All">
               All employees
             </option>
 
-            {employees.map(
-              (employee) => (
-
-                <option
-                  key={employee.id}
-                  value={employee.id}
-                >
-                  {employee.name}
-                </option>
-
-              )
-            )}
-
+            {employees.map((employee) => (
+              <option
+                key={employee.id}
+                value={employee.id}
+              >
+                {employee.name}
+              </option>
+            ))}
           </select>
 
-
           <select
-            className="input max-w-[180px]"
-            value={
-              statusFilter
-            }
+            className="input max-w-[200px]"
+            value={statusFilter}
             onChange={(e) =>
-              setStatusFilter(
-                e.target.value
-              )
+              setStatusFilter(e.target.value)
             }
           >
-
             <option value="All">
               All statuses
             </option>
-
-            <option value="Present">
-              Present
+            <option value="Working">
+              Working
             </option>
-
-            <option value="Late">
-              Late
+            <option value="On Break">
+              On Break
             </option>
-
-            <option value="Absent">
-              Absent
+            <option value="Completed">
+              Completed
             </option>
-
+            <option value="Not Started">
+              Not Started
+            </option>
           </select>
-
         </div>
-
       )}
 
-
-      {/* ==================================================
-          ATTENDANCE HISTORY
-         ================================================== */}
-
-      <section className="card overflow-hidden">
-
+      {/* Attendance History */}
+      <div className="card overflow-x-auto">
         <div className="border-b border-ink-100 p-5 dark:border-ink-800">
-
           <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-
-            {isEmployee
-              ? "Attendance History"
+            {isSelf
+              ? "My Attendance History"
               : "Employee Attendance"}
-
           </h3>
 
           <p className="mt-1 text-xs text-ink-400">
-
-            {isEmployee
-              ? "Your recent attendance records."
-              : "Attendance and working hours across employees."}
-
+            Login, logout, breaks and actual working time
           </p>
-
         </div>
 
-
-        <div className="overflow-x-auto">
-
-          <table className="w-full min-w-[900px] text-sm">
-
-            <thead>
-
-              <tr className="border-b border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
-
-                {!isEmployee && (
-
-                  <th className="p-4 font-medium">
-                    Employee
-                  </th>
-
-                )}
-
+        <table className="w-full min-w-[1000px] text-sm">
+          <thead>
+            <tr className="border-b border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
+              {!isSelf && (
                 <th className="p-4 font-medium">
-                  Date
+                  Employee
                 </th>
-
-                <th className="p-4 font-medium">
-                  Login
-                </th>
-
-                <th className="p-4 font-medium">
-                  Logout
-                </th>
-
-                <th className="p-4 font-medium">
-                  Break
-                </th>
-
-                <th className="p-4 font-medium">
-                  Working
-                </th>
-
-                <th className="p-4 font-medium">
-                  Status
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {rows.map(
-                (record) => {
-
-                  const employee =
-                    employees.find(
-                      (item) =>
-                        item.id ===
-                        record.employeeId
-                    );
-
-
-                  const breaks =
-                    getBreakMinutes(
-                      record
-                    );
-
-
-                  const working =
-                    getWorkingMinutes(
-                      record
-                    );
-
-
-                  return (
-
-                    <tr
-                      key={record.id}
-                      className="border-b border-ink-50 last:border-0 dark:border-ink-800/60"
-                    >
-
-                      {!isEmployee && (
-
-                        <td className="p-4 text-ink-800 dark:text-ink-100">
-
-                          {employee?.name ||
-                            "—"}
-
-                        </td>
-
-                      )}
-
-
-                      <td className="p-4 text-ink-600 dark:text-ink-300">
-                        {record.date}
-                      </td>
-
-
-                      <td className="p-4 font-medium text-ink-700 dark:text-ink-200">
-                        {formatTime(
-                          record.checkIn
-                        )}
-                      </td>
-
-
-                      <td className="p-4 font-medium text-ink-700 dark:text-ink-200">
-                        {formatTime(
-                          record.checkOut
-                        )}
-                      </td>
-
-
-                      <td className="p-4 text-ink-600 dark:text-ink-300">
-                        {formatDuration(
-                          breaks
-                        )}
-                      </td>
-
-
-                      <td className="p-4 text-ink-600 dark:text-ink-300">
-                        {formatDuration(
-                          working
-                        )}
-                      </td>
-
-
-                      <td className="p-4">
-
-                        <Badge
-                          status={
-                            record.workStatus ===
-                            "Completed"
-                              ? "Present"
-                              : record.workStatus ===
-                                "Working"
-                              ? "Present"
-                              : record.status
-                          }
-                        />
-
-                      </td>
-
-                    </tr>
-
-                  );
-
-                }
               )}
 
+              <th className="p-4 font-medium">
+                Date
+              </th>
 
-              {rows.length === 0 && (
+              <th className="p-4 font-medium">
+                Login
+              </th>
 
-                <tr>
+              <th className="p-4 font-medium">
+                Logout
+              </th>
 
-                  <td
-                    colSpan={
-                      isEmployee
-                        ? 6
-                        : 7
-                    }
-                    className="p-10 text-center text-sm text-ink-400"
-                  >
-                    No attendance records found.
+              <th className="p-4 font-medium">
+                Break
+              </th>
+
+              <th className="p-4 font-medium">
+                Working
+              </th>
+
+              <th className="p-4 font-medium">
+                Status
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((record) => {
+              const employee = employees.find(
+                (item) =>
+                  item.id === record.employeeId
+              );
+
+              const activeBreak =
+                getActiveBreak(
+                  breaks,
+                  record.employeeId,
+                  record.date
+                );
+
+              const breakMinutes =
+                getBreakMinutes(
+                  breaks,
+                  record.employeeId,
+                  record.date
+                );
+
+              const workingMinutes =
+                getWorkingMinutes(
+                  record,
+                  breaks
+                );
+
+              const status =
+                getEmployeeStatus(
+                  record,
+                  activeBreak
+                );
+
+              return (
+                <tr
+                  key={record.id}
+                  className="border-b border-ink-50 last:border-0 dark:border-ink-800/60"
+                >
+                  {!isSelf && (
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                          {employee?.name?.[0] ||
+                            "?"}
+                        </span>
+
+                        <div>
+                          <p className="font-medium text-ink-800 dark:text-ink-100">
+                            {employee?.name ||
+                              "Unknown"}
+                          </p>
+
+                          <p className="text-xs text-ink-400">
+                            {employee?.role || ""}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                  )}
+
+                  <td className="p-4 text-ink-600 dark:text-ink-300">
+                    {record.date}
                   </td>
 
+                  <td className="p-4 text-ink-600 dark:text-ink-300">
+                    {formatTime(record.checkIn)}
+                  </td>
+
+                  <td className="p-4 text-ink-600 dark:text-ink-300">
+                    {formatTime(record.checkOut)}
+                  </td>
+
+                  <td className="p-4">
+                    <span className="font-medium text-amber-600 dark:text-amber-400">
+                      {formatDuration(
+                        breakMinutes
+                      )}
+                    </span>
+
+                    {activeBreak && (
+                      <span className="ml-2 text-xs text-amber-500">
+                        Active
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="p-4">
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                      {formatDuration(
+                        workingMinutes
+                      )}
+                    </span>
+                  </td>
+
+                  <td className="p-4">
+                    {status === "Not Started" ? (
+                      <StatusPill
+                        status={status}
+                      />
+                    ) : (
+                      <StatusPill
+                        status={status}
+                      />
+                    )}
+                  </td>
                 </tr>
+              );
+            })}
 
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </section>
-
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={isSelf ? 6 : 7}
+                  className="p-10 text-center text-sm text-ink-400"
+                >
+                  No attendance records found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-
   );
 }

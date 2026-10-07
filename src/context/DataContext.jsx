@@ -9,71 +9,27 @@ import {
 
 const STORAGE_KEY = "hr-dashboard:data";
 
+function localDate() {
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+function localTime() {
+  return new Date().toTimeString().slice(0, 5);
+}
+
 const DEFAULT_STATE = {
   employees: seedEmployees,
   attendance: seedAttendance,
   leaves: seedLeaves,
   payroll: seedPayroll,
   tasks: seedTasks,
+  breaks: [],
   reports: [],
 };
-
-function getLocalDate() {
-  const date = new Date();
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function getCurrentTime() {
-  const date = new Date();
-
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-
-  return `${hours}:${minutes}`;
-}
-
-function timeToMinutes(time) {
-  if (!time) return 0;
-
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return hours * 60 + minutes;
-}
-
-function calculateBreakMinutes(record) {
-  if (!record?.breaks?.length) return 0;
-
-  return record.breaks.reduce((total, breakItem) => {
-    if (!breakItem.start) return total;
-
-    const start = timeToMinutes(breakItem.start);
-
-    const end = breakItem.end
-      ? timeToMinutes(breakItem.end)
-      : timeToMinutes(getCurrentTime());
-
-    return total + Math.max(0, end - start);
-  }, 0);
-}
-
-function calculateWorkingMinutes(record) {
-  if (!record?.checkIn) return 0;
-
-  const start = timeToMinutes(record.checkIn);
-
-  const end = record.checkOut
-    ? timeToMinutes(record.checkOut)
-    : timeToMinutes(getCurrentTime());
-
-  const totalMinutes = Math.max(0, end - start);
-
-  return Math.max(0, totalMinutes - calculateBreakMinutes(record));
-}
 
 function loadInitialState() {
   try {
@@ -85,7 +41,8 @@ function loadInitialState() {
       return {
         ...DEFAULT_STATE,
         ...parsed,
-        reports: parsed.reports ?? [],
+        breaks: Array.isArray(parsed.breaks) ? parsed.breaks : [],
+        reports: Array.isArray(parsed.reports) ? parsed.reports : [],
       };
     }
   } catch {
@@ -104,9 +61,9 @@ export function DataProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // ---------------------------------------------------------
-  // Employees
-  // ---------------------------------------------------------
+  // =========================================================
+  // EMPLOYEES
+  // =========================================================
 
   function addEmployee(employee) {
     const id = `emp-${Date.now()}`;
@@ -141,38 +98,54 @@ export function DataProvider({ children }) {
     setState((s) => ({
       ...s,
       employees: s.employees.filter((employee) => employee.id !== id),
+      attendance: s.attendance.filter(
+        (record) => record.employeeId !== id
+      ),
+      breaks: s.breaks.filter(
+        (record) => record.employeeId !== id
+      ),
+      tasks: s.tasks.filter(
+        (task) => task.employeeId !== id
+      ),
+      leaves: s.leaves.filter(
+        (leave) => leave.employeeId !== id
+      ),
+      payroll: s.payroll.filter(
+        (pay) => pay.employeeId !== id
+      ),
+      reports: s.reports.filter(
+        (report) => report.employeeId !== id
+      ),
     }));
   }
 
-  // ---------------------------------------------------------
-  // Attendance
-  // ---------------------------------------------------------
+  // =========================================================
+  // ATTENDANCE
+  // =========================================================
 
   function checkIn(employeeId) {
-    const today = getLocalDate();
-    const time = getCurrentTime();
+    const today = localDate();
+    const time = localTime();
 
     setState((s) => {
       const existing = s.attendance.find(
-        (attendance) =>
-          attendance.employeeId === employeeId &&
-          attendance.date === today
+        (record) =>
+          record.employeeId === employeeId &&
+          record.date === today
       );
 
       if (existing) {
         return {
           ...s,
-          attendance: s.attendance.map((attendance) =>
-            attendance.id === existing.id
+          attendance: s.attendance.map((record) =>
+            record.id === existing.id
               ? {
-                  ...attendance,
+                  ...record,
                   checkIn: time,
                   checkOut: null,
                   status: "Present",
-                  workStatus: "Working",
-                  breaks: attendance.breaks ?? [],
                 }
-              : attendance
+              : record
           ),
         };
       }
@@ -184,8 +157,6 @@ export function DataProvider({ children }) {
         status: "Present",
         checkIn: time,
         checkOut: null,
-        workStatus: "Working",
-        breaks: [],
       };
 
       return {
@@ -196,131 +167,97 @@ export function DataProvider({ children }) {
   }
 
   function checkOut(employeeId) {
-    const today = getLocalDate();
-    const time = getCurrentTime();
+    const today = localDate();
+    const time = localTime();
 
     setState((s) => ({
       ...s,
-      attendance: s.attendance.map((attendance) => {
-        if (
-          attendance.employeeId !== employeeId ||
-          attendance.date !== today
-        ) {
-          return attendance;
-        }
-
-        let breaks = attendance.breaks ?? [];
-
-        const openBreak = breaks.find((breakItem) => !breakItem.end);
-
-        if (openBreak) {
-          breaks = breaks.map((breakItem) =>
-            breakItem.id === openBreak.id
-              ? {
-                  ...breakItem,
-                  end: time,
-                }
-              : breakItem
-          );
-        }
-
-        return {
-          ...attendance,
-          checkOut: time,
-          workStatus: "Completed",
-          breaks,
-        };
-      }),
+      attendance: s.attendance.map((record) =>
+        record.employeeId === employeeId &&
+        record.date === today
+          ? {
+              ...record,
+              checkOut: time,
+              status: "Present",
+            }
+          : record
+      ),
     }));
   }
 
-  function startBreak(employeeId) {
-    const today = getLocalDate();
-    const time = getCurrentTime();
+  // =========================================================
+  // BREAKS
+  // =========================================================
 
-    setState((s) => ({
-      ...s,
-      attendance: s.attendance.map((attendance) => {
-        if (
-          attendance.employeeId !== employeeId ||
-          attendance.date !== today ||
-          !attendance.checkIn ||
-          attendance.checkOut
-        ) {
-          return attendance;
-        }
+  function startBreak(employeeId, reason, location) {
+    const today = localDate();
+    const time = localTime();
 
-        const breaks = attendance.breaks ?? [];
+    setState((s) => {
+      const attendanceRecord = s.attendance.find(
+        (record) =>
+          record.employeeId === employeeId &&
+          record.date === today
+      );
 
-        const alreadyOnBreak = breaks.some(
-          (breakItem) => !breakItem.end
-        );
+      if (!attendanceRecord?.checkIn) {
+        return s;
+      }
 
-        if (alreadyOnBreak) {
-          return attendance;
-        }
+      if (attendanceRecord.checkOut) {
+        return s;
+      }
 
-        return {
-          ...attendance,
-          workStatus: "On Break",
-          breaks: [
-            ...breaks,
-            {
-              id: `break-${Date.now()}`,
-              start: time,
-              end: null,
-            },
-          ],
-        };
-      }),
-    }));
+      const activeBreak = s.breaks.find(
+        (record) =>
+          record.employeeId === employeeId &&
+          record.date === today &&
+          !record.endTime
+      );
+
+      if (activeBreak) {
+        return s;
+      }
+
+      const breakRecord = {
+        id: `break-${employeeId}-${Date.now()}`,
+        employeeId,
+        date: today,
+        startTime: time,
+        endTime: null,
+        reason: reason || "Other",
+        location: location || "",
+      };
+
+      return {
+        ...s,
+        breaks: [breakRecord, ...s.breaks],
+      };
+    });
   }
 
   function endBreak(employeeId) {
-    const today = getLocalDate();
-    const time = getCurrentTime();
+    const today = localDate();
+    const time = localTime();
 
     setState((s) => ({
       ...s,
-      attendance: s.attendance.map((attendance) => {
-        if (
-          attendance.employeeId !== employeeId ||
-          attendance.date !== today
-        ) {
-          return attendance;
-        }
-
-        const breaks = attendance.breaks ?? [];
-
-        const openBreak = breaks.find(
-          (breakItem) => !breakItem.end
-        );
-
-        if (!openBreak) {
-          return attendance;
-        }
-
-        return {
-          ...attendance,
-          workStatus: attendance.checkOut
-            ? "Completed"
-            : "Working",
-          breaks: breaks.map((breakItem) =>
-            breakItem.id === openBreak.id
-              ? {
-                  ...breakItem,
-                  end: time,
-                }
-              : breakItem
-          ),
-        };
-      }),
+      breaks: s.breaks.map((record) =>
+        record.employeeId === employeeId &&
+        record.date === today &&
+        !record.endTime
+          ? {
+              ...record,
+              endTime: time,
+            }
+          : record
+      ),
     }));
   }
 
-  // ---------------------------------------------------------
-  // Leaves
-  // ---------------------------------------------------------
+  // =========================================================
+  // LEAVES
+  // =========================================================
 
   function requestLeave(leave) {
     const id = `lv-${Date.now()}`;
@@ -329,7 +266,7 @@ export function DataProvider({ children }) {
       ...leave,
       id,
       status: "Pending",
-      appliedOn: getLocalDate(),
+      appliedOn: localDate(),
     };
 
     setState((s) => ({
@@ -352,34 +289,34 @@ export function DataProvider({ children }) {
     }));
   }
 
-  // ---------------------------------------------------------
-  // Payroll
-  // ---------------------------------------------------------
+  // =========================================================
+  // PAYROLL
+  // =========================================================
 
   function updatePayroll(id, patch) {
     setState((s) => ({
       ...s,
-      payroll: s.payroll.map((payroll) => {
-        if (payroll.id !== id) return payroll;
+      payroll: s.payroll.map((pay) => {
+        if (pay.id !== id) return pay;
 
         const merged = {
-          ...payroll,
+          ...pay,
           ...patch,
         };
 
         merged.netPay =
-          merged.baseSalary +
-          merged.bonus -
-          merged.deductions;
+          Number(merged.baseSalary || 0) +
+          Number(merged.bonus || 0) -
+          Number(merged.deductions || 0);
 
         return merged;
       }),
     }));
   }
 
-  // ---------------------------------------------------------
-  // Tasks
-  // ---------------------------------------------------------
+  // =========================================================
+  // TASKS
+  // =========================================================
 
   function addTask(task) {
     const id = `tsk-${Date.now()}`;
@@ -387,9 +324,8 @@ export function DataProvider({ children }) {
     const record = {
       ...task,
       id,
-      status: task.status ?? "To Do",
-      progress: task.progress ?? 0,
-      createdOn: getLocalDate(),
+      status: "To Do",
+      createdOn: localDate(),
     };
 
     setState((s) => ({
@@ -427,21 +363,15 @@ export function DataProvider({ children }) {
           ? {
               ...task,
               status,
-              progress:
-                status === "Done"
-                  ? 100
-                  : status === "In Progress"
-                  ? Math.max(task.progress ?? 0, 1)
-                  : 0,
             }
           : task
       ),
     }));
   }
 
-  // ---------------------------------------------------------
-  // Daily Reports
-  // ---------------------------------------------------------
+  // =========================================================
+  // DAILY REPORTS
+  // =========================================================
 
   function addDailyReport(report) {
     const id = `report-${Date.now()}`;
@@ -449,19 +379,19 @@ export function DataProvider({ children }) {
     const record = {
       ...report,
       id,
-      createdAt: new Date().toISOString(),
+      submittedAt: new Date().toISOString(),
     };
 
     setState((s) => ({
       ...s,
-      reports: [record, ...(s.reports ?? [])],
+      reports: [record, ...s.reports],
     }));
   }
 
   function updateDailyReport(id, patch) {
     setState((s) => ({
       ...s,
-      reports: (s.reports ?? []).map((report) =>
+      reports: s.reports.map((report) =>
         report.id === id
           ? {
               ...report,
@@ -473,13 +403,14 @@ export function DataProvider({ children }) {
     }));
   }
 
-  // ---------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------
+  // =========================================================
+  // RESET
+  // =========================================================
 
   function resetDemoData() {
     setState({
       ...DEFAULT_STATE,
+      breaks: [],
       reports: [],
     });
   }
@@ -489,33 +420,37 @@ export function DataProvider({ children }) {
       value={{
         ...state,
 
-        reports: state.reports ?? [],
-
+        // Employees
         addEmployee,
         updateEmployee,
         deleteEmployee,
 
+        // Attendance
         checkIn,
         checkOut,
+
+        // Breaks
         startBreak,
         endBreak,
 
-        calculateBreakMinutes,
-        calculateWorkingMinutes,
-
+        // Leaves
         requestLeave,
         updateLeaveStatus,
 
+        // Payroll
         updatePayroll,
 
+        // Tasks
         addTask,
         updateTask,
         deleteTask,
         updateTaskStatus,
 
+        // Reports
         addDailyReport,
         updateDailyReport,
 
+        // Demo
         resetDemoData,
       }}
     >
