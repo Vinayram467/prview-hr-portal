@@ -2,22 +2,169 @@ import { NavLink } from "react-router-dom";
 import { ROLES } from "../../context/AuthContext";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: "▦", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
-  { to: "/employees", label: "Employees", icon: "👥", roles: [ROLES.ADMIN, ROLES.HR] },
-  { to: "/attendance", label: "Attendance", icon: "🕒", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
-  { to: "/leaves", label: "Leaves", icon: "📅", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
-  { to: "/tasks", label: "Tasks", icon: "✅", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
-  { to: "/payroll", label: "Payroll", icon: "💰", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
-  { to: "/reports", label: "Reports", icon: "📊", roles: [ROLES.ADMIN, ROLES.HR] },
-  { to: "/settings", label: "Settings", icon: "⚙️", roles: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE] },
+  /* =======================================================
+     COMMON
+  ======================================================== */
+
+  {
+    to: "/",
+    label: "Dashboard",
+    icon: "▦",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  /* =======================================================
+     ADMIN / HR
+  ======================================================== */
+
+  {
+    to: "/employees",
+    label: "Employees",
+    icon: "👥",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+    ],
+  },
+
+  {
+    to: "/attendance",
+    label: "Attendance",
+    icon: "🕒",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/tasks",
+    label: "Tasks",
+    icon: "✓",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/daily-report",
+    label: "Daily Reports",
+    icon: "📋",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+    ],
+  },
+
+  {
+    to: "/analytics",
+    label: "Analytics",
+    icon: "📊",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+    ],
+  },
+
+  /* =======================================================
+     EMPLOYEE
+  ======================================================== */
+
+  {
+    to: "/breaks",
+    label: "Breaks",
+    icon: "☕",
+    roles: [
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/daily-report",
+    label: "Daily Report",
+    icon: "📋",
+    roles: [
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/my-plans",
+    label: "My Plans",
+    icon: "📅",
+    roles: [
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/my-progress",
+    label: "My Progress",
+    icon: "📈",
+    roles: [
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  /* =======================================================
+     COMMON
+  ======================================================== */
+
+  {
+    to: "/leaves",
+    label: "Leaves",
+    icon: "📅",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/payroll",
+    label: "Payroll",
+    icon: "💰",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+      ROLES.EMPLOYEE,
+    ],
+  },
+
+  {
+    to: "/settings",
+    label: "Settings",
+    icon: "⚙",
+    roles: [
+      ROLES.ADMIN,
+      ROLES.HR,
+      ROLES.EMPLOYEE,
+    ],
+  },
 ];
 
-export default function Sidebar({ role, open, onClose }) {
-  const items = NAV_ITEMS.filter((item) => item.roles.includes(role));
+export default function Sidebar({
+  role,
+  open,
+  onClose,
+}) {
+  const items = NAV_ITEMS.filter((item) =>
+    item.roles.includes(role)
+  );
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* ===================================================
+          MOBILE OVERLAY
+      ==================================================== */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-ink-950/50 lg:hidden"
@@ -25,22 +172,45 @@ export default function Sidebar({ role, open, onClose }) {
         />
       )}
 
+      {/* ===================================================
+          SIDEBAR
+      ==================================================== */}
       <aside
-        className={`fixed z-50 top-0 left-0 h-full w-64 shrink-0
-        bg-white dark:bg-ink-900 border-r border-ink-100 dark:border-ink-800
-        transform transition-transform duration-200
-        ${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+        className={`
+          fixed
+          z-50
+          top-0
+          left-0
+          h-full
+          w-64
+          shrink-0
+          bg-white
+          dark:bg-ink-900
+          border-r
+          border-ink-100
+          dark:border-ink-800
+          transform
+          transition-transform
+          duration-200
+          ${open ? "translate-x-0" : "-translate-x-full"}
+          lg:translate-x-0
+        `}
       >
-        <div className="flex items-center gap-2 h-16 px-5 border-b border-ink-100 dark:border-ink-800">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-600 text-white font-display font-semibold">
-            T
-          </span>
-          <span className="font-display text-lg font-semibold text-ink-900 dark:text-white">
-            TalentFlow HR
-          </span>
+        {/* =================================================
+            LOGO
+        ================================================== */}
+        <div className="flex items-center h-16 px-5 border-b border-ink-100 dark:border-ink-800">
+          <img
+            src="/prview-logo.png"
+            alt="PRview"
+            className="h-9 w-auto object-contain"
+          />
         </div>
 
-        <nav className="p-3 space-y-1">
+        {/* =================================================
+            NAVIGATION
+        ================================================== */}
+        <nav className="p-3 space-y-1 overflow-y-auto h-[calc(100%-112px)]">
           {items.map((item) => (
             <NavLink
               key={item.to}
@@ -48,22 +218,47 @@ export default function Sidebar({ role, open, onClose }) {
               end={item.to === "/"}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                `
+                flex
+                items-center
+                gap-3
+                rounded-md
+                px-3
+                py-2.5
+                text-sm
+                font-medium
+                transition-colors
+                ${
                   isActive
                     ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
                     : "text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-800"
-                }`
+                }
+                `
               }
             >
-              <span aria-hidden="true">{item.icon}</span>
-              {item.label}
+              <span
+                aria-hidden="true"
+                className="w-5 text-center"
+              >
+                {item.icon}
+              </span>
+
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-ink-100 dark:border-ink-800">
-          <p className="text-xs text-ink-400">TalentFlow HR Template</p>
-          <p className="text-xs text-ink-400">v1.0 — demo data only</p>
+        {/* =================================================
+            FOOTER
+        ================================================== */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900">
+          <p className="text-xs font-medium text-ink-500 dark:text-ink-400">
+            PRview
+          </p>
+
+          <p className="text-xs text-ink-400">
+            PR & Marketing Agency
+          </p>
         </div>
       </aside>
     </>
