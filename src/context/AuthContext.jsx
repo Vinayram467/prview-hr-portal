@@ -1,31 +1,42 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { seedEmployees, DEMO_EMPLOYEE_ID } from "../data/mockData";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
+import {
+  seedEmployees,
+  DEMO_EMPLOYEE_ID,
+} from "../data/mockData";
 
 export const ROLES = {
   ADMIN: "admin",
-  HR: "hr",
   EMPLOYEE: "employee",
 };
 
-// Demo credentials only — replace this with a real auth API before
-// shipping. Never store real passwords in plain text like this.
+// Demo credentials only.
+// These will be replaced by real authentication when the backend is connected.
 export const DEMO_ACCOUNTS = [
   {
     username: "admin",
     password: "admin123",
-    profile: { id: "user-admin", name: "Nora Ahmed", role: ROLES.ADMIN, employeeId: null },
-  },
-  {
-    username: "hr",
-    password: "hr123",
-    profile: { id: "user-hr", name: "Ahmed Samir", role: ROLES.HR, employeeId: "emp-006" },
+    profile: {
+      id: "user-admin",
+      name: "Nora Ahmed",
+      role: ROLES.ADMIN,
+      employeeId: null,
+    },
   },
   {
     username: "employee",
     password: "employee123",
     profile: {
       id: "user-employee",
-      name: seedEmployees.find((e) => e.id === DEMO_EMPLOYEE_ID)?.name ?? "Youssef Karim",
+      name:
+        seedEmployees.find(
+          (employee) =>
+            employee.id === DEMO_EMPLOYEE_ID
+        )?.name ?? "Youssef Karim",
       role: ROLES.EMPLOYEE,
       employeeId: DEMO_EMPLOYEE_ID,
     },
@@ -34,38 +45,81 @@ export const DEMO_ACCOUNTS = [
 
 const STORAGE_KEY = "hr-dashboard:auth";
 
+const VALID_ROLES = [
+  ROLES.ADMIN,
+  ROLES.EMPLOYEE,
+];
+
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch {
+function loadStoredUser() {
+  try {
+    const stored = localStorage.getItem(
+      STORAGE_KEY
+    );
+
+    if (!stored) {
       return null;
     }
-  });
+
+    const parsed = JSON.parse(stored);
+
+    // Automatically invalidate old HR sessions
+    // or any unknown role.
+    if (
+      !parsed ||
+      !VALID_ROLES.includes(parsed.role)
+    ) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+}
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(
+    loadStoredUser
+  );
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(user)
+      );
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, [user]);
 
-  // Returns { ok: true } on success or { ok: false, error } on failure.
-  // Wire this up to a real API call (fetch/axios) when you connect a backend —
-  // the rest of the app only cares about the shape of `user`, not where it came from.
   function login(username, password) {
     const account = DEMO_ACCOUNTS.find(
-      (a) => a.username.toLowerCase() === username.trim().toLowerCase()
+      (item) =>
+        item.username.toLowerCase() ===
+        username.trim().toLowerCase()
     );
-    if (!account || account.password !== password) {
-      return { ok: false, error: "Incorrect username or password." };
+
+    if (
+      !account ||
+      account.password !== password
+    ) {
+      return {
+        ok: false,
+        error:
+          "Incorrect username or password.",
+      };
     }
+
     setUser(account.profile);
-    return { ok: true };
+
+    return {
+      ok: true,
+    };
   }
 
   function logout() {
@@ -73,14 +127,26 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      "useAuth must be used within AuthProvider"
+    );
+  }
+
+  return context;
 }

@@ -32,24 +32,49 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        {/* Dashboard */}
+
         <Route
           path="/"
           element={<Dashboard />}
         />
 
+        {/* Admin only */}
+
         <Route
           path="/employees"
           element={
             <ProtectedRoute
-              allowedRoles={[
-                ROLES.ADMIN,
-                ROLES.HR,
-              ]}
+              allowedRoles={[ROLES.ADMIN]}
             >
               <Employees />
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN]}
+            >
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN]}
+            >
+              <Reports />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin + Employee */}
 
         <Route
           path="/attendance"
@@ -77,7 +102,6 @@ export default function App() {
             <ProtectedRoute
               allowedRoles={[
                 ROLES.ADMIN,
-                ROLES.HR,
                 ROLES.EMPLOYEE,
               ]}
             >
@@ -92,39 +116,10 @@ export default function App() {
             <ProtectedRoute
               allowedRoles={[
                 ROLES.ADMIN,
-                ROLES.HR,
                 ROLES.EMPLOYEE,
               ]}
             >
               <MyPlans />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                ROLES.ADMIN,
-                ROLES.HR,
-              ]}
-            >
-              <Analytics />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                ROLES.ADMIN,
-                ROLES.HR,
-              ]}
-            >
-              <Reports />
             </ProtectedRoute>
           }
         />

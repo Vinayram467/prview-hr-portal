@@ -1,110 +1,78 @@
 import { useMemo, useState } from "react";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  BarChart,
-  Bar,
-} from "recharts";
+import { useSearchParams } from "react-router-dom";
+import { useAuth, ROLES } from "../context/AuthContext";
+import { localDate, useData } from "../context/DataContext";
 
-import { useData } from "../context/DataContext";
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
+function todayStr() {
+  return localDate();
+}
 
 function formatTime(time) {
   if (!time) return "—";
 
   const [hour, minute] = time.split(":");
-
   const date = new Date();
-  date.setHours(Number(hour), Number(minute), 0, 0);
 
-  return date.toLocaleTimeString("en-IN", {
+  date.setHours(Number(hour), Number(minute));
+
+  return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
 }
 
-function formatDate(date) {
-  if (!date) return "—";
-
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatShortDate(date) {
-  if (!date) return "—";
-
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-function minutesFromTime(time) {
+function timeToMinutes(time) {
   if (!time) return null;
 
-  const [hours, minutes] = time.split(":").map(Number);
+  const [hours, minutes] = time
+    .split(":")
+    .map(Number);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes)
+  ) {
+    return null;
+  }
 
   return hours * 60 + minutes;
 }
 
-function durationBetweenTimes(start, end) {
-  const startMinutes = minutesFromTime(start);
-
-  if (startMinutes === null) return 0;
-
-  let endMinutes = minutesFromTime(end);
-
-  if (endMinutes === null) {
-    const now = new Date();
-    endMinutes = now.getHours() * 60 + now.getMinutes();
+function formatMinutes(minutes) {
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return "0m";
   }
-
-  let duration = endMinutes - startMinutes;
-
-  if (duration < 0) {
-    duration += 24 * 60;
-  }
-
-  return Math.max(0, duration);
-}
-
-function durationBetweenISO(start, end) {
-  if (!start) return 0;
-
-  const startDate = new Date(start);
-  const endDate = end ? new Date(end) : new Date();
-
-  const duration = Math.round(
-    (endDate.getTime() - startDate.getTime()) / 60000
-  );
-
-  return Math.max(0, duration);
-}
-
-function formatDuration(minutes) {
-  if (!minutes || minutes < 1) return "0m";
 
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
 
-  if (hours === 0) {
-    return `${mins}m`;
-  }
-
-  if (mins === 0) {
-    return `${hours}h`;
-  }
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
 
   return `${hours}h ${mins}m`;
+}
+
+function calculateDuration(start, end) {
+  const startMinutes = timeToMinutes(start);
+
+  if (startMinutes === null) {
+    return 0;
+  }
+
+  const endMinutes =
+    timeToMinutes(end) ??
+    timeToMinutes(
+      new Date().toTimeString().slice(0, 5)
+    );
+
+  if (
+    endMinutes === null ||
+    endMinutes < startMinutes
+  ) {
+    return 0;
+  }
+
+  return endMinutes - startMinutes;
 }
 
 function getTaskProgress(status) {
@@ -113,109 +81,156 @@ function getTaskProgress(status) {
   return 0;
 }
 
-function getStatusClasses(status) {
-  if (
-    status === "Present" ||
-    status === "Done" ||
-    status === "Approved"
-  ) {
-    return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300";
-  }
-
-  if (
-    status === "Late" ||
-    status === "In Progress" ||
-    status === "Pending"
-  ) {
-    return "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300";
-  }
-
-  if (
-    status === "Absent" ||
-    status === "Rejected"
-  ) {
-    return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300";
-  }
-
-  return "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300";
-}
-
-function Badge({ children }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClasses(
-        children
-      )}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function StatCard({ label, value, description }) {
-  return (
-    <div className="card p-5">
-      <p className="text-sm text-ink-500 dark:text-ink-400">
-        {label}
-      </p>
-
-      <p className="mt-2 text-2xl font-semibold text-ink-900 dark:text-white">
-        {value}
-      </p>
-
-      {description && (
-        <p className="mt-1 text-xs text-ink-400">
-          {description}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function ProgressBar({ progress }) {
-  const safeProgress = Math.max(
-    0,
-    Math.min(100, progress)
-  );
-
-  const barClass =
-    safeProgress === 100
-      ? "bg-emerald-500"
-      : safeProgress >= 50
-      ? "bg-brand-500"
-      : "bg-ink-300 dark:bg-ink-600";
-
   return (
     <div className="flex items-center gap-3">
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
         <div
-          className={`h-full rounded-full transition-all ${barClass}`}
-          style={{ width: `${safeProgress}%` }}
+          className={`h-full rounded-full transition-all ${
+            progress === 100
+              ? "bg-emerald-500"
+              : progress >= 50
+              ? "bg-brand-500"
+              : "bg-ink-300 dark:bg-ink-600"
+          }`}
+          style={{
+            width: `${progress}%`,
+          }}
         />
       </div>
 
       <span className="w-10 text-right text-xs font-semibold text-ink-600 dark:text-ink-300">
-        {safeProgress}%
+        {progress}%
       </span>
     </div>
   );
 }
 
+function StatusBadge({ status }) {
+  const styles = {
+    Present:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+
+    Working:
+      "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+
+    Late:
+      "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+
+    Absent:
+      "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+
+    "On Break":
+      "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+
+    Done:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+
+    "In Progress":
+      "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+
+    "To Do":
+      "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300",
+
+    Planned:
+      "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+
+    Completed:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+
+    Pending:
+      "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+
+    Approved:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+
+    Rejected:
+      "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+  };
+
+  return (
+    <span
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
+        styles[status] ||
+        "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300"
+      }`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  description,
+  icon,
+}) {
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-ink-500 dark:text-ink-400">
+            {label}
+          </p>
+
+          <p className="mt-2 text-2xl font-semibold text-ink-900 dark:text-white">
+            {value}
+          </p>
+
+          {description && (
+            <p className="mt-1 text-xs text-ink-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Analytics() {
+  const { user } = useAuth();
+
   const {
     employees,
     attendance,
     tasks,
-    breaks,
+    breaks = [],
+    reports = [],
+    plans = [],
     leaves,
-    reports,
   } = useData();
 
-  const [selectedEmployeeId, setSelectedEmployeeId] =
-    useState(employees[0]?.id ?? "");
+  const [searchParams, setSearchParams] =
+    useSearchParams();
 
-  const selectedEmployee = employees.find(
-    (employee) => employee.id === selectedEmployeeId
+  const employeeFromUrl =
+    searchParams.get("employee");
+
+  const defaultEmployee =
+    user?.role === ROLES.EMPLOYEE
+      ? user.employeeId
+      : employeeFromUrl ||
+        employees[0]?.id ||
+        "";
+
+  const [selectedEmployeeId, setSelectedEmployeeId] =
+    useState(defaultEmployee);
+
+  const isEmployee =
+    user?.role === ROLES.EMPLOYEE;
+
+  const employeeId = isEmployee
+    ? user.employeeId
+    : selectedEmployeeId;
+
+  const employee = employees.find(
+    (item) => item.id === employeeId
   );
 
   const today = todayStr();
@@ -224,48 +239,69 @@ export default function Analytics() {
     return attendance
       .filter(
         (record) =>
-          record.employeeId === selectedEmployeeId
+          record.employeeId === employeeId
       )
       .sort((a, b) =>
         a.date < b.date ? 1 : -1
       );
-  }, [attendance, selectedEmployeeId]);
+  }, [attendance, employeeId]);
 
   const employeeTasks = useMemo(() => {
     return tasks.filter(
       (task) =>
-        task.employeeId === selectedEmployeeId
+        task.employeeId === employeeId
     );
-  }, [tasks, selectedEmployeeId]);
+  }, [tasks, employeeId]);
 
   const employeeBreaks = useMemo(() => {
-    return breaks.filter(
-      (item) =>
-        item.employeeId === selectedEmployeeId
-    );
-  }, [breaks, selectedEmployeeId]);
-
-  const employeeLeaves = useMemo(() => {
-    return leaves
+    return breaks
       .filter(
-        (leave) =>
-          leave.employeeId === selectedEmployeeId
+        (item) =>
+          item.employeeId === employeeId
       )
-      .sort((a, b) =>
-        a.appliedOn < b.appliedOn ? 1 : -1
-      );
-  }, [leaves, selectedEmployeeId]);
+      .sort((a, b) => {
+        if (a.date !== b.date) {
+          return a.date < b.date ? 1 : -1;
+        }
+
+        return a.startTime < b.startTime
+          ? 1
+          : -1;
+      });
+  }, [breaks, employeeId]);
 
   const employeeReports = useMemo(() => {
     return reports
       .filter(
         (report) =>
-          report.employeeId === selectedEmployeeId
+          report.employeeId === employeeId
       )
       .sort((a, b) =>
         a.date < b.date ? 1 : -1
       );
-  }, [reports, selectedEmployeeId]);
+  }, [reports, employeeId]);
+
+  const employeePlans = useMemo(() => {
+    return plans
+      .filter(
+        (plan) =>
+          plan.employeeId === employeeId
+      )
+      .sort((a, b) =>
+        a.date < b.date ? 1 : -1
+      );
+  }, [plans, employeeId]);
+
+  const employeeLeaves = useMemo(() => {
+    return leaves
+      .filter(
+        (leave) =>
+          leave.employeeId === employeeId
+      )
+      .sort((a, b) =>
+        a.startDate < b.startDate ? 1 : -1
+      );
+  }, [leaves, employeeId]);
 
   const todayAttendance = employeeAttendance.find(
     (record) => record.date === today
@@ -275,241 +311,204 @@ export default function Analytics() {
     (item) => item.date === today
   );
 
-  const todayBreakMinutes = todayBreaks.reduce(
-    (total, item) =>
-      total +
-      durationBetweenISO(
-        item.startTime,
-        item.endTime
-      ),
-    0
+  const activeBreak = todayBreaks.find(
+    (item) =>
+      item.startTime &&
+      !item.endTime
   );
 
-  const todayGrossMinutes = todayAttendance?.checkIn
-    ? durationBetweenTimes(
-        todayAttendance.checkIn,
-        todayAttendance.checkOut
-      )
-    : 0;
+  const todayBreakMinutes =
+    todayBreaks.reduce(
+      (sum, item) =>
+        sum +
+        calculateDuration(
+          item.startTime,
+          item.endTime
+        ),
+      0
+    );
 
-  const todayNetMinutes = Math.max(
-    0,
-    todayGrossMinutes - todayBreakMinutes
-  );
+  const todayWorkingMinutes =
+    todayAttendance?.checkIn
+      ? Math.max(
+          0,
+          calculateDuration(
+            todayAttendance.checkIn,
+            todayAttendance.checkOut
+          ) - todayBreakMinutes
+        )
+      : 0;
 
-  const completedTasks = employeeTasks.filter(
-    (task) => task.status === "Done"
-  ).length;
+  const completedTasks =
+    employeeTasks.filter(
+      (task) => task.status === "Done"
+    ).length;
 
-  const inProgressTasks = employeeTasks.filter(
-    (task) => task.status === "In Progress"
-  ).length;
+  const pendingTasks =
+    employeeTasks.filter(
+      (task) => task.status !== "Done"
+    );
 
-  const pendingTasks = employeeTasks.filter(
-    (task) => task.status === "To Do"
-  ).length;
-
-  const taskCompletion =
+  const taskProgress =
     employeeTasks.length > 0
       ? Math.round(
-          (completedTasks / employeeTasks.length) *
+          employeeTasks.reduce(
+            (sum, task) =>
+              sum +
+              getTaskProgress(
+                task.status
+              ),
+            0
+          ) /
+            employeeTasks.length
+        )
+      : 0;
+
+  const attendanceDays =
+    employeeAttendance.length;
+
+  const presentDays =
+    employeeAttendance.filter(
+      (record) =>
+        record.status !== "Absent"
+    ).length;
+
+  const attendanceRate =
+    attendanceDays > 0
+      ? Math.round(
+          (presentDays /
+            attendanceDays) *
             100
         )
       : 0;
 
-  const attendanceStats = useMemo(() => {
-    const workingDays = employeeAttendance.filter(
-      (record) => record.status !== "Absent"
-    ).length;
+  const reportsSubmitted =
+    employeeReports.length;
 
-    const presentDays = employeeAttendance.filter(
-      (record) => record.status === "Present"
-    ).length;
+  const reportDates = new Set(
+    employeeReports.map(
+      (report) => report.date
+    )
+  );
 
-    const lateDays = employeeAttendance.filter(
-      (record) => record.status === "Late"
-    ).length;
+  const reportRate =
+    attendanceDays > 0
+      ? Math.round(
+          (reportsSubmitted /
+            attendanceDays) *
+            100
+        )
+      : 0;
 
-    const absentDays = employeeAttendance.filter(
-      (record) => record.status === "Absent"
-    ).length;
+  const totalBreakMinutes =
+    employeeBreaks.reduce(
+      (sum, item) =>
+        sum +
+        calculateDuration(
+          item.startTime,
+          item.endTime
+        ),
+      0
+    );
 
-    const attendanceRate =
-      employeeAttendance.length > 0
-        ? Math.round(
-            (workingDays /
-              employeeAttendance.length) *
-              100
-          )
-        : 0;
+  const totalWorkMinutes =
+    employeeAttendance.reduce(
+      (sum, record) => {
+        if (!record.checkIn) {
+          return sum;
+        }
 
-    return {
-      workingDays,
-      presentDays,
-      lateDays,
-      absentDays,
-      attendanceRate,
-    };
-  }, [employeeAttendance]);
-
-  const totalWorkedMinutes = useMemo(() => {
-    return employeeAttendance.reduce(
-      (total, record) => {
-        if (!record.checkIn) return total;
-
-        const gross = durationBetweenTimes(
-          record.checkIn,
-          record.checkOut
-        );
-
-        const dayBreaks = employeeBreaks.filter(
-          (item) => item.date === record.date
-        );
-
-        const breakMinutes = dayBreaks.reduce(
-          (breakTotal, item) =>
-            breakTotal +
-            durationBetweenISO(
-              item.startTime,
-              item.endTime
-            ),
-          0
-        );
+        const dayBreakMinutes =
+          employeeBreaks
+            .filter(
+              (item) =>
+                item.date ===
+                record.date
+            )
+            .reduce(
+              (breakSum, item) =>
+                breakSum +
+                calculateDuration(
+                  item.startTime,
+                  item.endTime
+                ),
+              0
+            );
 
         return (
-          total +
-          Math.max(0, gross - breakMinutes)
+          sum +
+          Math.max(
+            0,
+            calculateDuration(
+              record.checkIn,
+              record.checkOut
+            ) -
+              dayBreakMinutes
+          )
         );
       },
       0
     );
-  }, [employeeAttendance, employeeBreaks]);
 
-  const averageWorkdayMinutes =
-    attendanceStats.workingDays > 0
+  const averageWorkMinutes =
+    presentDays > 0
       ? Math.round(
-          totalWorkedMinutes /
-            attendanceStats.workingDays
+          totalWorkMinutes /
+            presentDays
         )
       : 0;
 
-  const totalBreakMinutes = employeeBreaks.reduce(
-    (total, item) =>
-      total +
-      durationBetweenISO(
-        item.startTime,
-        item.endTime
-      ),
-    0
-  );
+  const upcomingPlans =
+    employeePlans.filter(
+      (plan) => plan.date >= today
+    );
 
-  const leaveStats = useMemo(() => {
-    let approved = 0;
-    let pending = 0;
-    let rejected = 0;
+  const completedPlans =
+    employeePlans.filter(
+      (plan) =>
+        plan.status === "Completed"
+    ).length;
 
-    employeeLeaves.forEach((leave) => {
-      if (leave.status === "Approved") approved += 1;
-      if (leave.status === "Pending") pending += 1;
-      if (leave.status === "Rejected") rejected += 1;
+  const inProgressPlans =
+    employeePlans.filter(
+      (plan) =>
+        plan.status === "In Progress"
+    ).length;
+
+  const pendingLeaves =
+    employeeLeaves.filter(
+      (leave) =>
+        leave.status === "Pending"
+    ).length;
+
+  const approvedLeaves =
+    employeeLeaves.filter(
+      (leave) =>
+        leave.status === "Approved"
+    ).length;
+
+  function handleEmployeeChange(
+    event
+  ) {
+    const id = event.target.value;
+
+    setSelectedEmployeeId(id);
+
+    setSearchParams({
+      employee: id,
     });
+  }
 
-    return {
-      total: employeeLeaves.length,
-      approved,
-      pending,
-      rejected,
-    };
-  }, [employeeLeaves]);
-
-  const attendanceChartData = useMemo(() => {
-    return [...employeeAttendance]
-      .sort((a, b) =>
-        a.date > b.date ? 1 : -1
-      )
-      .slice(-14)
-      .map((record) => ({
-        date: formatShortDate(record.date),
-        rate:
-          record.status === "Absent"
-            ? 0
-            : record.status === "Late"
-            ? 75
-            : 100,
-        status: record.status,
-      }));
-  }, [employeeAttendance]);
-
-  const workTimeChartData = useMemo(() => {
-    return [...employeeAttendance]
-      .sort((a, b) =>
-        a.date > b.date ? 1 : -1
-      )
-      .slice(-14)
-      .map((record) => {
-        const gross = record.checkIn
-          ? durationBetweenTimes(
-              record.checkIn,
-              record.checkOut
-            )
-          : 0;
-
-        const dayBreaks = employeeBreaks.filter(
-          (item) => item.date === record.date
-        );
-
-        const breakMinutes = dayBreaks.reduce(
-          (total, item) =>
-            total +
-            durationBetweenISO(
-              item.startTime,
-              item.endTime
-            ),
-          0
-        );
-
-        return {
-          date: formatShortDate(record.date),
-          hours: Number(
-            Math.max(
-              0,
-              gross - breakMinutes
-            ) / 60
-          ).toFixed(1),
-        };
-      });
-  }, [employeeAttendance, employeeBreaks]);
-
-  const recentTasks = useMemo(() => {
-    return [...employeeTasks]
-      .sort((a, b) => {
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-
-        return a.dueDate > b.dueDate ? 1 : -1;
-      })
-      .slice(0, 8);
-  }, [employeeTasks]);
-
-  const recentReports = employeeReports.slice(0, 5);
-
-  const initials =
-    selectedEmployee?.name
-      ?.split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "?";
-
-  if (!selectedEmployee) {
+  if (!employee) {
     return (
       <div className="card p-8 text-center">
         <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-white">
-          No employees available
+          No employee selected
         </h2>
 
-        <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
-          Add an employee before opening analytics.
+        <p className="mt-2 text-sm text-ink-400">
+          Select an employee to view
+          their analytics.
         </p>
       </div>
     );
@@ -518,449 +517,348 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       {/* Employee selector */}
-      <section className="card p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-medium text-brand-600 dark:text-brand-400">
-              Employee Analytics
-            </p>
 
-            <h2 className="mt-1 font-display text-xl font-semibold text-ink-900 dark:text-white">
-              Individual performance overview
-            </h2>
+      {!isEmployee && (
+        <section className="card p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-brand-600 dark:text-brand-400">
+                Employee Analytics
+              </p>
 
-            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-              Select an employee to review attendance,
-              work time, tasks, reports and leaves.
-            </p>
-          </div>
+              <h2 className="mt-1 font-display text-xl font-semibold text-ink-900 dark:text-white">
+                Individual Performance
+              </h2>
 
-          <div className="w-full lg:w-72">
-            <label className="label">
-              Select employee
-            </label>
+              <p className="mt-1 text-xs text-ink-400">
+                Select an employee to inspect
+                their complete work history.
+              </p>
+            </div>
 
-            <select
-              className="input"
-              value={selectedEmployeeId}
-              onChange={(event) =>
-                setSelectedEmployeeId(
-                  event.target.value
-                )
-              }
-            >
-              {employees.map((employee) => (
-                <option
-                  key={employee.id}
-                  value={employee.id}
-                >
-                  {employee.name} · {employee.role}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </section>
+            <div className="w-full md:max-w-sm">
+              <label className="label">
+                Select employee
+              </label>
 
-      {/* Employee profile */}
-      <section className="card overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold text-white"
-                style={{
-                  backgroundColor:
-                    selectedEmployee.avatarColor ||
-                    "#7C3AED",
-                }}
+              <select
+                className="input"
+                value={employeeId}
+                onChange={
+                  handleEmployeeChange
+                }
               >
-                {initials}
-              </div>
+                {employees.map(
+                  (item) => (
+                    <option
+                      key={item.id}
+                      value={item.id}
+                    >
+                      {item.name} —{" "}
+                      {item.role}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+          </div>
+        </section>
+      )}
 
-              <div>
-                <h2 className="font-display text-2xl font-semibold text-ink-900 dark:text-white">
-                  {selectedEmployee.name}
-                </h2>
+      {/* Profile */}
 
-                <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                  {selectedEmployee.role} ·{" "}
-                  {selectedEmployee.department}
-                </p>
-
-                <p className="mt-1 text-xs text-ink-400">
-                  {selectedEmployee.email} · Joined{" "}
-                  {formatDate(
-                    selectedEmployee.joinDate
-                  )}
-                </p>
-              </div>
+      <section className="card overflow-hidden p-6">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-xl font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+              {employee.name
+                .split(" ")
+                .map(
+                  (name) =>
+                    name[0]
+                )
+                .join("")
+                .slice(0, 2)}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge>
-                {selectedEmployee.status}
-              </Badge>
+            <div>
+              <h2 className="font-display text-2xl font-semibold text-ink-900 dark:text-white">
+                {employee.name}
+              </h2>
 
-              <span className="rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-                {selectedEmployee.id}
-              </span>
+              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                {employee.role}
+              </p>
+
+              <p className="mt-1 text-xs text-ink-400">
+                {employee.department}
+                {employee.email
+                  ? ` · ${employee.email}`
+                  : ""}
+              </p>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge
+              status={employee.status}
+            />
+
+            {activeBreak && (
+              <StatusBadge status="On Break" />
+            )}
+
+            {todayAttendance?.checkIn &&
+              !todayAttendance?.checkOut &&
+              !activeBreak && (
+                <StatusBadge status="Working" />
+              )}
           </div>
         </div>
       </section>
 
-      {/* Today's overview */}
-      <section>
-        <div className="mb-3">
+      {/* Main stats */}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <StatCard
+          label="Task Progress"
+          value={`${taskProgress}%`}
+          description={`${completedTasks}/${employeeTasks.length} completed`}
+          icon="✓"
+        />
+
+        <StatCard
+          label="Attendance"
+          value={`${attendanceRate}%`}
+          description={`${presentDays}/${attendanceDays} days`}
+          icon="◉"
+        />
+
+        <StatCard
+          label="Today Work"
+          value={formatMinutes(
+            todayWorkingMinutes
+          )}
+          description={
+            todayAttendance?.checkIn
+              ? "Net working time"
+              : "Not checked in"
+          }
+          icon="◷"
+        />
+
+        <StatCard
+          label="Avg Workday"
+          value={formatMinutes(
+            averageWorkMinutes
+          )}
+          description="Average net time"
+          icon="⌛"
+        />
+
+        <StatCard
+          label="Reports"
+          value={`${reportsSubmitted}`}
+          description={`${reportRate}% report rate`}
+          icon="▤"
+        />
+
+        <StatCard
+          label="Plans"
+          value={`${upcomingPlans.length}`}
+          description={`${completedPlans} completed`}
+          icon="→"
+        />
+      </div>
+
+      {/* Today's status */}
+
+      <section className="card p-5">
+        <div className="mb-5">
           <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-            Today
+            Today's Status
           </h3>
 
-          <p className="text-xs text-ink-500 dark:text-ink-400">
-            {formatDate(today)}
+          <p className="mt-1 text-xs text-ink-400">
+            Current attendance and activity
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            label="Attendance"
-            value={
-              todayAttendance?.status || "Not marked"
-            }
-            description={
-              todayAttendance?.checkIn
-                ? `In ${formatTime(
-                    todayAttendance.checkIn
-                  )}`
-                : "No clock-in recorded"
-            }
-          />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Login
+            </p>
 
-          <StatCard
-            label="Working time"
-            value={formatDuration(todayNetMinutes)}
-            description={
-              todayAttendance?.checkOut
-                ? `Out ${formatTime(
-                    todayAttendance.checkOut
-                  )}`
-                : todayAttendance?.checkIn
-                ? "Currently working"
-                : "No work session"
-            }
-          />
-
-          <StatCard
-            label="Break time"
-            value={formatDuration(todayBreakMinutes)}
-            description={`${todayBreaks.length} break${
-              todayBreaks.length === 1 ? "" : "s"
-            } today`}
-          />
-
-          <StatCard
-            label="Tasks"
-            value={`${completedTasks}/${employeeTasks.length}`}
-            description={`${taskCompletion}% completed`}
-          />
-
-          <StatCard
-            label="Reports"
-            value={
-              employeeReports.some(
-                (report) => report.date === today
-              )
-                ? "Submitted"
-                : "Missing"
-            }
-            description="Today's daily report"
-          />
-        </div>
-      </section>
-
-      {/* Performance summary */}
-      <section>
-        <div className="mb-3">
-          <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-            Performance summary
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Task completion"
-            value={`${taskCompletion}%`}
-            description={`${completedTasks} completed · ${pendingTasks} pending`}
-          />
-
-          <StatCard
-            label="Attendance rate"
-            value={`${attendanceStats.attendanceRate}%`}
-            description={`${attendanceStats.presentDays} present · ${attendanceStats.lateDays} late`}
-          />
-
-          <StatCard
-            label="Average workday"
-            value={formatDuration(
-              averageWorkdayMinutes
-            )}
-            description="Based on recorded working days"
-          />
-
-          <StatCard
-            label="Total break time"
-            value={formatDuration(
-              totalBreakMinutes
-            )}
-            description={`${employeeBreaks.length} recorded breaks`}
-          />
-        </div>
-      </section>
-
-      {/* Charts */}
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="card p-5">
-          <div className="mb-4">
-            <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-              Attendance history
-            </h3>
-
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Last 14 recorded attendance days
+            <p className="mt-2 font-semibold text-ink-900 dark:text-white">
+              {formatTime(
+                todayAttendance?.checkIn
+              )}
             </p>
           </div>
 
-          {attendanceChartData.length > 0 ? (
-            <ResponsiveContainer
-              width="100%"
-              height={260}
-            >
-              <LineChart
-                data={attendanceChartData}
-                margin={{
-                  top: 10,
-                  right: 10,
-                  left: -10,
-                  bottom: 0,
-                }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  className="text-ink-100 dark:text-ink-800"
-                />
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Logout
+            </p>
 
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  stroke="currentColor"
-                  className="text-ink-400"
-                />
-
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 11 }}
-                  stroke="currentColor"
-                  className="text-ink-400"
-                  unit="%"
-                />
-
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => [
-                    `${value}%`,
-                    "Attendance",
-                  ]}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="rate"
-                  stroke="#7C3AED"
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState text="No attendance history available." />
-          )}
-        </div>
-
-        <div className="card p-5">
-          <div className="mb-4">
-            <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-              Working time history
-            </h3>
-
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Net working hours after recorded breaks
+            <p className="mt-2 font-semibold text-ink-900 dark:text-white">
+              {formatTime(
+                todayAttendance?.checkOut
+              )}
             </p>
           </div>
 
-          {workTimeChartData.length > 0 ? (
-            <ResponsiveContainer
-              width="100%"
-              height={260}
-            >
-              <BarChart
-                data={workTimeChartData}
-                margin={{
-                  top: 10,
-                  right: 10,
-                  left: -10,
-                  bottom: 0,
-                }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  className="text-ink-100 dark:text-ink-800"
-                />
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Working time
+            </p>
 
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  stroke="currentColor"
-                  className="text-ink-400"
-                />
+            <p className="mt-2 font-semibold text-ink-900 dark:text-white">
+              {formatMinutes(
+                todayWorkingMinutes
+              )}
+            </p>
+          </div>
 
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  stroke="currentColor"
-                  className="text-ink-400"
-                  unit="h"
-                />
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Break time
+            </p>
 
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => [
-                    `${value} hours`,
-                    "Working time",
-                  ]}
-                />
+            <p className="mt-2 font-semibold text-ink-900 dark:text-white">
+              {formatMinutes(
+                todayBreakMinutes
+              )}
+            </p>
 
-                <Bar
-                  dataKey="hours"
-                  fill="#7C3AED"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState text="No working-time history available." />
-          )}
+            {activeBreak && (
+              <p className="mt-1 text-xs text-amber-600">
+                Currently on break
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Daily report
+            </p>
+
+            <div className="mt-2">
+              <StatusBadge
+                status={
+                  reportDates.has(today)
+                    ? "Completed"
+                    : "Pending"
+                }
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Task performance */}
+      {/* Tasks */}
+
       <section className="card p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-              Task-by-task performance
+              Task Performance
             </h3>
 
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Individual task status and completion
+            <p className="mt-1 text-xs text-ink-400">
+              Task-by-task performance for this
+              employee
             </p>
           </div>
 
-          <div className="text-sm text-ink-500 dark:text-ink-400">
-            {completedTasks} completed ·{" "}
-            {inProgressTasks} in progress ·{" "}
-            {pendingTasks} pending
-          </div>
+          <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+            {taskProgress}% overall
+          </span>
         </div>
 
-        <div className="mt-5 space-y-3">
-          {recentTasks.map((task) => {
-            const progress = getTaskProgress(
-              task.status
-            );
+        <div className="space-y-4">
+          {employeeTasks.map((task) => (
+            <div
+              key={task.id}
+              className="rounded-xl border border-ink-100 p-4 dark:border-ink-800"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-medium text-ink-800 dark:text-ink-100">
+                    {task.title}
+                  </p>
 
-            return (
-              <div
-                key={task.id}
-                className="rounded-xl border border-ink-100 p-4 dark:border-ink-800"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium text-ink-800 dark:text-ink-100">
-                      {task.title}
-                    </p>
-
-                    <p className="mt-1 text-xs text-ink-400">
-                      Due{" "}
-                      {task.dueDate
-                        ? formatDate(task.dueDate)
-                        : "—"}
-                      {task.priority
-                        ? ` · ${task.priority} priority`
-                        : ""}
-                    </p>
-                  </div>
-
-                  <Badge>{task.status}</Badge>
+                  <p className="mt-1 text-xs text-ink-400">
+                    Due {task.dueDate}
+                    {task.priority
+                      ? ` · ${task.priority} priority`
+                      : ""}
+                  </p>
                 </div>
 
-                <div className="mt-3">
-                  <ProgressBar
-                    progress={progress}
-                  />
-                </div>
+                <StatusBadge
+                  status={task.status}
+                />
               </div>
-            );
-          })}
 
-          {recentTasks.length === 0 && (
-            <EmptyState text="No tasks assigned to this employee." />
+              <div className="mt-4">
+                <ProgressBar
+                  progress={getTaskProgress(
+                    task.status
+                  )}
+                />
+              </div>
+            </div>
+          ))}
+
+          {employeeTasks.length === 0 && (
+            <p className="py-8 text-center text-sm text-ink-400">
+              No tasks assigned to this employee.
+            </p>
           )}
         </div>
       </section>
 
-      {/* Attendance history table */}
-      <section className="card overflow-hidden">
-        <div className="p-5">
+      {/* Attendance history */}
+
+      <section className="card p-5">
+        <div className="mb-5">
           <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-            Attendance history
+            Attendance History
           </h3>
 
-          <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-            Recent attendance records for this employee
+          <p className="mt-1 text-xs text-ink-400">
+            Recent attendance records
           </p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-sm">
             <thead>
-              <tr className="border-y border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
-                <th className="p-4 font-medium">
+              <tr className="border-b border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
+                <th className="pb-3 font-medium">
                   Date
                 </th>
 
-                <th className="p-4 font-medium">
+                <th className="pb-3 font-medium">
+                  Login
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Logout
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Working
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Break
+                </th>
+
+                <th className="pb-3 font-medium">
                   Status
-                </th>
-
-                <th className="p-4 font-medium">
-                  Check in
-                </th>
-
-                <th className="p-4 font-medium">
-                  Check out
-                </th>
-
-                <th className="p-4 font-medium">
-                  Working time
                 </th>
               </tr>
             </thead>
@@ -969,163 +867,321 @@ export default function Analytics() {
               {employeeAttendance
                 .slice(0, 14)
                 .map((record) => {
-                  const gross = record.checkIn
-                    ? durationBetweenTimes(
-                        record.checkIn,
-                        record.checkOut
-                      )
-                    : 0;
-
                   const dayBreaks =
                     employeeBreaks.filter(
                       (item) =>
-                        item.date === record.date
+                        item.date ===
+                        record.date
                     );
 
                   const breakMinutes =
                     dayBreaks.reduce(
-                      (total, item) =>
-                        total +
-                        durationBetweenISO(
+                      (sum, item) =>
+                        sum +
+                        calculateDuration(
                           item.startTime,
                           item.endTime
                         ),
                       0
                     );
 
-                  const net = Math.max(
-                    0,
-                    gross - breakMinutes
-                  );
+                  const workingMinutes =
+                    record.checkIn
+                      ? Math.max(
+                          0,
+                          calculateDuration(
+                            record.checkIn,
+                            record.checkOut
+                          ) -
+                            breakMinutes
+                        )
+                      : 0;
 
                   return (
                     <tr
                       key={record.id}
                       className="border-b border-ink-50 last:border-0 dark:border-ink-800/60"
                     >
-                      <td className="p-4 text-ink-700 dark:text-ink-200">
-                        {formatDate(record.date)}
+                      <td className="py-3 text-ink-800 dark:text-ink-100">
+                        {record.date}
                       </td>
 
-                      <td className="p-4">
-                        <Badge>
-                          {record.status}
-                        </Badge>
-                      </td>
-
-                      <td className="p-4 text-ink-600 dark:text-ink-300">
+                      <td className="py-3 text-ink-600 dark:text-ink-300">
                         {formatTime(
                           record.checkIn
                         )}
                       </td>
 
-                      <td className="p-4 text-ink-600 dark:text-ink-300">
+                      <td className="py-3 text-ink-600 dark:text-ink-300">
                         {formatTime(
                           record.checkOut
                         )}
                       </td>
 
-                      <td className="p-4 font-medium text-ink-700 dark:text-ink-200">
-                        {formatDuration(net)}
+                      <td className="py-3 text-ink-600 dark:text-ink-300">
+                        {record.checkIn
+                          ? formatMinutes(
+                              workingMinutes
+                            )
+                          : "—"}
+                      </td>
+
+                      <td className="py-3 text-ink-600 dark:text-ink-300">
+                        {formatMinutes(
+                          breakMinutes
+                        )}
+                      </td>
+
+                      <td className="py-3">
+                        <StatusBadge
+                          status={
+                            record.status
+                          }
+                        />
                       </td>
                     </tr>
                   );
                 })}
+
+              {employeeAttendance.length ===
+                0 && (
+                <tr>
+                  <td
+                    colSpan="6"
+                    className="py-8 text-center text-sm text-ink-400"
+                  >
+                    No attendance records
+                    available.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-
-        {employeeAttendance.length === 0 && (
-          <div className="p-6">
-            <EmptyState text="No attendance records found." />
-          </div>
-        )}
       </section>
 
-      {/* Daily reports */}
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="card p-5">
-          <div className="mb-4">
+      {/* Break history */}
+
+      <section className="card p-5">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
             <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-              Daily reports
+              Break History
             </h3>
 
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Reports submitted by this employee
+            <p className="mt-1 text-xs text-ink-400">
+              Where the employee went and how
+              long the break lasted
             </p>
           </div>
 
-          <div className="space-y-3">
-            {recentReports.map((report) => (
+          <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+            {formatMinutes(
+              totalBreakMinutes
+            )}{" "}
+            total
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[750px] text-sm">
+            <thead>
+              <tr className="border-b border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
+                <th className="pb-3 font-medium">
+                  Date
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Start
+                </th>
+
+                <th className="pb-3 font-medium">
+                  End
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Duration
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Where
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Reason
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Status
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {employeeBreaks
+                .slice(0, 20)
+                .map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-b border-ink-50 last:border-0 dark:border-ink-800/60"
+                  >
+                    <td className="py-3 text-ink-800 dark:text-ink-100">
+                      {item.date}
+                    </td>
+
+                    <td className="py-3 text-ink-600 dark:text-ink-300">
+                      {formatTime(
+                        item.startTime
+                      )}
+                    </td>
+
+                    <td className="py-3 text-ink-600 dark:text-ink-300">
+                      {formatTime(
+                        item.endTime
+                      )}
+                    </td>
+
+                    <td className="py-3 font-medium text-ink-700 dark:text-ink-200">
+                      {formatMinutes(
+                        calculateDuration(
+                          item.startTime,
+                          item.endTime
+                        )
+                      )}
+                    </td>
+
+                    <td className="py-3 text-ink-600 dark:text-ink-300">
+                      {item.location ||
+                        "—"}
+                    </td>
+
+                    <td className="max-w-[200px] truncate py-3 text-ink-600 dark:text-ink-300">
+                      {item.reason || "—"}
+                    </td>
+
+                    <td className="py-3">
+                      <StatusBadge
+                        status={
+                          item.endTime
+                            ? "Completed"
+                            : "On Break"
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+
+              {employeeBreaks.length ===
+                0 && (
+                <tr>
+                  <td
+                    colSpan="7"
+                    className="py-8 text-center text-sm text-ink-400"
+                  >
+                    No break records
+                    available.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Daily Reports */}
+
+      <section className="card p-5">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h3 className="font-display font-semibold text-ink-900 dark:text-white">
+              Daily Reports
+            </h3>
+
+            <p className="mt-1 text-xs text-ink-400">
+              Submitted work summaries
+            </p>
+          </div>
+
+          <span className="text-sm font-semibold text-ink-700 dark:text-ink-200">
+            {reportsSubmitted} submitted
+          </span>
+        </div>
+
+        <div className="space-y-4">
+          {employeeReports
+            .slice(0, 7)
+            .map((report) => (
               <div
                 key={report.id}
                 className="rounded-xl border border-ink-100 p-4 dark:border-ink-800"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium text-ink-800 dark:text-ink-100">
-                    {formatDate(report.date)}
-                  </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium text-ink-800 dark:text-ink-100">
+                      {report.date}
+                    </p>
 
-                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    Submitted
-                  </span>
+                    <p className="text-xs text-ink-400">
+                      Daily work report
+                    </p>
+                  </div>
+
+                  <StatusBadge status="Completed" />
                 </div>
 
-                {report.completed && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-medium text-ink-400">
                       Completed
                     </p>
 
-                    <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
-                      {report.completed}
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
+                      {report.completed ||
+                        "—"}
                     </p>
                   </div>
-                )}
 
-                {report.pending && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                  <div>
+                    <p className="text-xs font-medium text-ink-400">
                       Pending
                     </p>
 
-                    <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
-                      {report.pending}
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
+                      {report.pending ||
+                        "—"}
                     </p>
                   </div>
-                )}
 
-                {report.blockers && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                  <div>
+                    <p className="text-xs font-medium text-ink-400">
                       Blockers
                     </p>
 
-                    <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
-                      {report.blockers}
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
+                      {report.blockers ||
+                        "None"}
                     </p>
                   </div>
-                )}
 
-                {report.tomorrowPlan && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                      Tomorrow
+                  <div>
+                    <p className="text-xs font-medium text-ink-400">
+                      Tomorrow's plan
                     </p>
 
-                    <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
-                      {report.tomorrowPlan}
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
+                      {report.tomorrowPlan ||
+                        "—"}
                     </p>
                   </div>
-                )}
+                </div>
 
                 {report.notes && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                  <div className="mt-4 border-t border-ink-100 pt-4 dark:border-ink-800">
+                    <p className="text-xs font-medium text-ink-400">
                       Notes
                     </p>
 
-                    <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
                       {report.notes}
                     </p>
                   </div>
@@ -1133,198 +1189,203 @@ export default function Analytics() {
               </div>
             ))}
 
-            {recentReports.length === 0 && (
-              <EmptyState text="No daily reports submitted yet." />
-            )}
-          </div>
+          {employeeReports.length ===
+            0 && (
+            <p className="py-8 text-center text-sm text-ink-400">
+              No daily reports submitted yet.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* Plans */}
+
+      <section className="card p-5">
+        <div className="mb-5">
+          <h3 className="font-display font-semibold text-ink-900 dark:text-white">
+            Employee Plans
+          </h3>
+
+          <p className="mt-1 text-xs text-ink-400">
+            Planned and future work
+          </p>
         </div>
 
-        {/* Leave analytics */}
-        <div className="card p-5">
-          <div className="mb-4">
-            <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-              Leave analytics
-            </h3>
-
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Leave requests and approval status
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <MiniMetric
-              label="Total requests"
-              value={leaveStats.total}
-            />
-
-            <MiniMetric
-              label="Approved"
-              value={leaveStats.approved}
-            />
-
-            <MiniMetric
-              label="Pending"
-              value={leaveStats.pending}
-            />
-
-            <MiniMetric
-              label="Rejected"
-              value={leaveStats.rejected}
-            />
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {employeeLeaves.map((leave) => (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {employeePlans
+            .slice(0, 8)
+            .map((plan) => (
               <div
-                key={leave.id}
+                key={plan.id}
                 className="rounded-xl border border-ink-100 p-4 dark:border-ink-800"
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-ink-800 dark:text-ink-100">
-                      {leave.type}
+                      {plan.title}
                     </p>
 
                     <p className="mt-1 text-xs text-ink-400">
-                      {formatDate(
-                        leave.startDate
-                      )}{" "}
-                      →{" "}
-                      {formatDate(
-                        leave.endDate
-                      )}
+                      {plan.date}
                     </p>
                   </div>
 
-                  <Badge>{leave.status}</Badge>
+                  <StatusBadge
+                    status={
+                      plan.status ||
+                      "Planned"
+                    }
+                  />
                 </div>
 
-                {leave.reason && (
-                  <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
-                    {leave.reason}
-                  </p>
+                {plan.priorities && (
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-ink-400">
+                      Priorities
+                    </p>
+
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
+                      {plan.priorities}
+                    </p>
+                  </div>
+                )}
+
+                {plan.description && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-ink-400">
+                      Action plan
+                    </p>
+
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600 dark:text-ink-300">
+                      {plan.description}
+                    </p>
+                  </div>
                 )}
               </div>
             ))}
 
-            {employeeLeaves.length === 0 && (
-              <EmptyState text="No leave records found." />
-            )}
-          </div>
+          {employeePlans.length === 0 && (
+            <p className="col-span-full py-8 text-center text-sm text-ink-400">
+              No plans created yet.
+            </p>
+          )}
         </div>
       </section>
 
-      {/* Overall performance */}
-      <section className="card p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="font-display font-semibold text-ink-900 dark:text-white">
-              Recent performance
-            </h3>
+      {/* Leave analytics */}
 
-            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-              Management summary for {selectedEmployee.name}
+      <section className="card p-5">
+        <div className="mb-5">
+          <h3 className="font-display font-semibold text-ink-900 dark:text-white">
+            Leave Analytics
+          </h3>
+
+          <p className="mt-1 text-xs text-ink-400">
+            Leave history for this employee
+          </p>
+        </div>
+
+        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Total requests
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold text-ink-900 dark:text-white">
+              {employeeLeaves.length}
             </p>
           </div>
 
-          <div className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-            {taskCompletion}% task completion
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Approved
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold text-emerald-600">
+              {approvedLeaves}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
+            <p className="text-xs text-ink-400">
+              Pending
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold text-amber-600">
+              {pendingLeaves}
+            </p>
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <PerformanceItem
-            title="Attendance"
-            value={`${attendanceStats.attendanceRate}%`}
-            description={`${attendanceStats.presentDays} present days`}
-            progress={attendanceStats.attendanceRate}
-          />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[650px] text-sm">
+            <thead>
+              <tr className="border-b border-ink-100 text-left text-xs text-ink-400 dark:border-ink-800">
+                <th className="pb-3 font-medium">
+                  Type
+                </th>
 
-          <PerformanceItem
-            title="Task delivery"
-            value={`${taskCompletion}%`}
-            description={`${completedTasks} of ${employeeTasks.length} tasks completed`}
-            progress={taskCompletion}
-          />
+                <th className="pb-3 font-medium">
+                  Dates
+                </th>
 
-          <PerformanceItem
-            title="Report discipline"
-            value={
-              employeeReports.length > 0
-                ? "Active"
-                : "No reports"
-            }
-            description={`${employeeReports.length} report${
-              employeeReports.length === 1
-                ? ""
-                : "s"
-            } submitted`}
-            progress={
-              employeeAttendance.length > 0
-                ? Math.min(
-                    100,
-                    Math.round(
-                      (employeeReports.length /
-                        employeeAttendance.length) *
-                        100
-                    )
-                  )
-                : 0
-            }
-          />
+                <th className="pb-3 font-medium">
+                  Reason
+                </th>
+
+                <th className="pb-3 font-medium">
+                  Status
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {employeeLeaves.map(
+                (leave) => (
+                  <tr
+                    key={leave.id}
+                    className="border-b border-ink-50 last:border-0 dark:border-ink-800/60"
+                  >
+                    <td className="py-3 text-ink-700 dark:text-ink-200">
+                      {leave.type}
+                    </td>
+
+                    <td className="py-3 text-ink-600 dark:text-ink-300">
+                      {leave.startDate} →{" "}
+                      {leave.endDate}
+                    </td>
+
+                    <td className="max-w-[250px] truncate py-3 text-ink-600 dark:text-ink-300">
+                      {leave.reason ||
+                        "—"}
+                    </td>
+
+                    <td className="py-3">
+                      <StatusBadge
+                        status={
+                          leave.status
+                        }
+                      />
+                    </td>
+                  </tr>
+                )
+              )}
+
+              {employeeLeaves.length ===
+                0 && (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className="py-8 text-center text-sm text-ink-400"
+                  >
+                    No leave records.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
-  );
-}
-
-function MiniMetric({ label, value }) {
-  return (
-    <div className="rounded-xl bg-ink-50 p-4 dark:bg-ink-800/60">
-      <p className="text-xs text-ink-500 dark:text-ink-400">
-        {label}
-      </p>
-
-      <p className="mt-1 text-xl font-semibold text-ink-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function PerformanceItem({
-  title,
-  value,
-  description,
-  progress,
-}) {
-  return (
-    <div className="rounded-xl border border-ink-100 p-4 dark:border-ink-800">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-ink-700 dark:text-ink-200">
-          {title}
-        </p>
-
-        <p className="text-lg font-semibold text-ink-900 dark:text-white">
-          {value}
-        </p>
-      </div>
-
-      <p className="mt-1 text-xs text-ink-400">
-        {description}
-      </p>
-
-      <div className="mt-4">
-        <ProgressBar progress={progress} />
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ text }) {
-  return (
-    <p className="py-6 text-center text-sm text-ink-400">
-      {text}
-    </p>
   );
 }
