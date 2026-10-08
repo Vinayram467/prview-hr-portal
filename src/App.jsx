@@ -2,7 +2,6 @@ import { Routes, Route } from "react-router-dom";
 
 import Layout from "./components/layout/Layout";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
-
 import { ROLES } from "./context/AuthContext";
 
 import Login from "./pages/Login";
@@ -14,6 +13,8 @@ import Tasks from "./pages/Tasks";
 import Payroll from "./pages/Payroll";
 import Reports from "./pages/Reports";
 import Analytics from "./pages/Analytics";
+import DailyReports from "./pages/DailyReports";
+import MyPlans from "./pages/MyPlans";
 import Settings from "./pages/Settings";
 
 export default function App() {
@@ -71,15 +72,31 @@ export default function App() {
         />
 
         <Route
-          path="/reports"
+          path="/daily-reports"
           element={
             <ProtectedRoute
               allowedRoles={[
                 ROLES.ADMIN,
                 ROLES.HR,
+                ROLES.EMPLOYEE,
               ]}
             >
-              <Reports />
+              <DailyReports />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/my-plans"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                ROLES.ADMIN,
+                ROLES.HR,
+                ROLES.EMPLOYEE,
+              ]}
+            >
+              <MyPlans />
             </ProtectedRoute>
           }
         />
@@ -94,6 +111,20 @@ export default function App() {
               ]}
             >
               <Analytics />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                ROLES.ADMIN,
+                ROLES.HR,
+              ]}
+            >
+              <Reports />
             </ProtectedRoute>
           }
         />

@@ -14,9 +14,11 @@ const TITLES = {
   "/attendance": "Attendance",
   "/leaves": "Leaves",
   "/tasks": "Tasks",
+  "/daily-reports": "Daily Reports",
+  "/my-plans": "My Plans",
+  "/analytics": "Analytics",
   "/payroll": "Payroll",
   "/reports": "Reports",
-  "/analytics": "Analytics",
   "/settings": "Settings",
 };
 
@@ -30,7 +32,7 @@ export default function Layout() {
 
   const title =
     TITLES[location.pathname] ??
-    "TalentFlow HR";
+    "PRview Employee Portal";
 
   return (
     <div className="min-h-screen bg-ink-50 dark:bg-ink-950">

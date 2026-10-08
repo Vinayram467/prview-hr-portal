@@ -15,10 +15,6 @@ import {
 
 const STORAGE_KEY = "hr-dashboard:data";
 
-/* =========================================================
-   DATE / TIME HELPERS
-========================================================= */
-
 export function localDate(date = new Date()) {
   const d = new Date(date);
   const offset = d.getTimezoneOffset();
@@ -42,10 +38,6 @@ export function localDateTime(date = new Date()) {
   return new Date(date).toISOString();
 }
 
-/* =========================================================
-   DEFAULT DATA
-========================================================= */
-
 const DEFAULT_STATE = {
   employees: seedEmployees,
   attendance: seedAttendance,
@@ -54,11 +46,8 @@ const DEFAULT_STATE = {
   tasks: seedTasks,
   breaks: [],
   reports: [],
+  plans: [],
 };
-
-/* =========================================================
-   LOAD DATA
-========================================================= */
 
 function loadInitialState() {
   try {
@@ -71,8 +60,6 @@ function loadInitialState() {
         ...DEFAULT_STATE,
         ...parsed,
 
-        // Make sure new arrays exist even if an older
-        // localStorage version did not have them.
         employees: Array.isArray(parsed.employees)
           ? parsed.employees
           : DEFAULT_STATE.employees,
@@ -100,6 +87,10 @@ function loadInitialState() {
         reports: Array.isArray(parsed.reports)
           ? parsed.reports
           : [],
+
+        plans: Array.isArray(parsed.plans)
+          ? parsed.plans
+          : [],
       };
     }
   } catch {
@@ -111,10 +102,6 @@ function loadInitialState() {
 
 const DataContext = createContext(null);
 
-/* =========================================================
-   PROVIDER
-========================================================= */
-
 export function DataProvider({ children }) {
   const [state, setState] = useState(loadInitialState);
 
@@ -125,13 +112,8 @@ export function DataProvider({ children }) {
     );
   }, [state]);
 
-  /* =======================================================
-     EMPLOYEES
-  ======================================================= */
-
   function addEmployee(employee) {
     const id = `emp-${Date.now()}`;
-
     const record = {
       ...employee,
       id,
@@ -151,13 +133,14 @@ export function DataProvider({ children }) {
   function updateEmployee(id, patch) {
     setState((s) => ({
       ...s,
-      employees: s.employees.map((employee) =>
-        employee.id === id
-          ? {
-              ...employee,
-              ...patch,
-            }
-          : employee
+      employees: s.employees.map(
+        (employee) =>
+          employee.id === id
+            ? {
+                ...employee,
+                ...patch,
+              }
+            : employee
       ),
     }));
   }
@@ -193,12 +176,12 @@ export function DataProvider({ children }) {
       reports: s.reports.filter(
         (report) => report.employeeId !== id
       ),
+
+      plans: s.plans.filter(
+        (plan) => plan.employeeId !== id
+      ),
     }));
   }
-
-  /* =======================================================
-     ATTENDANCE
-  ======================================================= */
 
   function checkIn(employeeId) {
     if (!employeeId) return false;
@@ -215,7 +198,6 @@ export function DataProvider({ children }) {
           record.date === today
       );
 
-      // Already checked in and not checked out.
       if (
         existing?.checkIn &&
         !existing?.checkOut
@@ -223,8 +205,6 @@ export function DataProvider({ children }) {
         return s;
       }
 
-      // If a previous record exists for today,
-      // do not create a duplicate record.
       if (existing) {
         success = true;
 
@@ -277,11 +257,12 @@ export function DataProvider({ children }) {
     let success = false;
 
     setState((s) => {
-      const attendanceRecord = s.attendance.find(
-        (record) =>
-          record.employeeId === employeeId &&
-          record.date === today
-      );
+      const attendanceRecord =
+        s.attendance.find(
+          (record) =>
+            record.employeeId === employeeId &&
+            record.date === today
+        );
 
       if (!attendanceRecord?.checkIn) {
         return s;
@@ -291,11 +272,6 @@ export function DataProvider({ children }) {
         return s;
       }
 
-      /*
-       * IMPORTANT:
-       * Never allow checkout while an active break exists.
-       * The employee must end the break first.
-       */
       const activeBreak = s.breaks.some(
         (item) =>
           item.employeeId === employeeId &&
@@ -328,10 +304,6 @@ export function DataProvider({ children }) {
     return success;
   }
 
-  /* =======================================================
-     BREAKS
-  ======================================================= */
-
   function startBreak(
     employeeId,
     reason = "Other",
@@ -352,9 +324,6 @@ export function DataProvider({ children }) {
             record.date === today
         );
 
-      /*
-       * Employee must be clocked in.
-       */
       if (
         !attendanceRecord?.checkIn ||
         attendanceRecord?.checkOut
@@ -362,10 +331,6 @@ export function DataProvider({ children }) {
         return s;
       }
 
-      /*
-       * Do not allow another break while
-       * an existing break is active.
-       */
       const activeBreak = s.breaks.some(
         (item) =>
           item.employeeId === employeeId &&
@@ -441,10 +406,6 @@ export function DataProvider({ children }) {
     return success;
   }
 
-  /* =======================================================
-     LEAVES
-  ======================================================= */
-
   function requestLeave(leave) {
     const id = `lv-${Date.now()}`;
 
@@ -457,6 +418,7 @@ export function DataProvider({ children }) {
 
     setState((s) => ({
       ...s,
+
       leaves: [
         record,
         ...s.leaves,
@@ -482,10 +444,6 @@ export function DataProvider({ children }) {
     }));
   }
 
-  /* =======================================================
-     PAYROLL
-  ======================================================= */
-
   function updatePayroll(id, patch) {
     setState((s) => ({
       ...s,
@@ -510,10 +468,6 @@ export function DataProvider({ children }) {
     }));
   }
 
-  /* =======================================================
-     TASKS
-  ======================================================= */
-
   function addTask(task) {
     const id = `tsk-${Date.now()}`;
 
@@ -526,6 +480,7 @@ export function DataProvider({ children }) {
 
     setState((s) => ({
       ...s,
+
       tasks: [
         record,
         ...s.tasks,
@@ -577,10 +532,6 @@ export function DataProvider({ children }) {
     }));
   }
 
-  /* =======================================================
-     DAILY REPORTS
-  ======================================================= */
-
   function addDailyReport(report) {
     const today = localDate();
 
@@ -590,9 +541,6 @@ export function DataProvider({ children }) {
         item.date === report.date
     );
 
-    /*
-     * One report per employee per date.
-     */
     if (existing) {
       updateDailyReport(existing.id, {
         ...report,
@@ -604,9 +552,13 @@ export function DataProvider({ children }) {
 
     const record = {
       ...report,
+
       id: `report-${Date.now()}`,
+
       date: report.date || today,
+
       createdAt: new Date().toISOString(),
+
       updatedAt: new Date().toISOString(),
     };
 
@@ -640,9 +592,75 @@ export function DataProvider({ children }) {
     }));
   }
 
-  /* =======================================================
-     RESET DEMO DATA
-  ======================================================= */
+  function addPlan(plan) {
+    const existing = state.plans?.find(
+      (item) =>
+        item.employeeId === plan.employeeId &&
+        item.date === plan.date
+    );
+
+    if (existing) {
+      updatePlan(existing.id, {
+        ...plan,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return existing;
+    }
+
+    const record = {
+      ...plan,
+
+      id: `plan-${Date.now()}`,
+
+      date: plan.date || localDate(),
+
+      status: plan.status || "Planned",
+
+      createdAt: new Date().toISOString(),
+
+      updatedAt: new Date().toISOString(),
+    };
+
+    setState((s) => ({
+      ...s,
+
+      plans: [
+        record,
+        ...s.plans,
+      ],
+    }));
+
+    return record;
+  }
+
+  function updatePlan(id, patch) {
+    setState((s) => ({
+      ...s,
+
+      plans: s.plans.map(
+        (plan) =>
+          plan.id === id
+            ? {
+                ...plan,
+                ...patch,
+                updatedAt:
+                  new Date().toISOString(),
+              }
+            : plan
+      ),
+    }));
+  }
+
+  function deletePlan(id) {
+    setState((s) => ({
+      ...s,
+
+      plans: s.plans.filter(
+        (plan) => plan.id !== id
+      ),
+    }));
+  }
 
   function resetDemoData() {
     setState({
@@ -653,49 +671,42 @@ export function DataProvider({ children }) {
       tasks: [...seedTasks],
       breaks: [],
       reports: [],
+      plans: [],
     });
   }
-
-  /* =======================================================
-     PROVIDER
-  ======================================================= */
 
   return (
     <DataContext.Provider
       value={{
         ...state,
 
-        // Employees
         addEmployee,
         updateEmployee,
         deleteEmployee,
 
-        // Attendance
         checkIn,
         checkOut,
 
-        // Breaks
         startBreak,
         endBreak,
 
-        // Leaves
         requestLeave,
         updateLeaveStatus,
 
-        // Payroll
         updatePayroll,
 
-        // Tasks
         addTask,
         updateTask,
         deleteTask,
         updateTaskStatus,
 
-        // Reports
         addDailyReport,
         updateDailyReport,
 
-        // Utilities
+        addPlan,
+        updatePlan,
+        deletePlan,
+
         resetDemoData,
       }}
     >
@@ -703,10 +714,6 @@ export function DataProvider({ children }) {
     </DataContext.Provider>
   );
 }
-
-/* =========================================================
-   HOOK
-========================================================= */
 
 export function useData() {
   const ctx = useContext(DataContext);
